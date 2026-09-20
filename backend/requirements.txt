@@ -1,0 +1,33 @@
+# FastAPI & Web Framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+pydantic>=2.6.0
+pydantic-settings>=2.2.0
+python-multipart>=0.0.9
+httpx>=0.27.0
+requests>=2.31.0
+
+# Graph & Threat Intelligence
+neo4j>=5.18.0
+networkx>=3.2.1
+stix2>=3.0.1
+stix2-patterns>=2.0.0
+
+# Data Science & Machine Learning
+numpy>=1.26.0
+scipy>=1.12.0
+scikit-learn>=1.4.0
+hdbscan>=0.8.33
+
+# Text Processing & Ingestion
+beautifulsoup4>=4.12.3
+lxml>=5.1.0
+tldextract>=5.1.2
+pypdf>=4.0.0
+
+# Testing & DevSecOps
+pytest>=8.0.0
+pytest-asyncio>=0.23.5
+ruff>=0.3.0
+mypy>=1.9.0
+bandit>=1.7.8
