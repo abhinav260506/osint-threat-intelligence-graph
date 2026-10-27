@@ -1,5 +1,8 @@
 """ThreatGraph-AI - Master FastAPI Application Entry Point."""
 
+import os
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware

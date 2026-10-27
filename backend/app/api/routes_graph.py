@@ -2,6 +2,7 @@
 
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 from backend.app.graph.graph_engine import knowledge_graph
 
 router = APIRouter(prefix="/graph", tags=["Knowledge Graph"])
@@ -49,3 +50,26 @@ async def clear_graph():
     """Resets all nodes and edges in the graph."""
     knowledge_graph.clear()
     return {"status": "success", "message": "Knowledge graph cleared"}
+
+
+class CypherQueryRequest(BaseModel):
+    query: str = Field(..., min_length=3, description="Cypher query to execute")
+
+
+@router.post("/cypher")
+async def execute_custom_cypher(payload: CypherQueryRequest):
+    """Executes a custom Cypher query against Neo4j and returns Cytoscape-formatted graph elements."""
+    from backend.app.graph.neo4j import neo4j_manager
+
+    if not neo4j_manager.is_available:
+        raise HTTPException(
+            status_code=503,
+            detail="Neo4j database is currently disconnected. Please verify connection in .env.",
+        )
+
+    try:
+        result = neo4j_manager.execute_cypher_to_graph(payload.query)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Cypher execution failed: {str(e)}")
+

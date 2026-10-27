@@ -1,9 +1,9 @@
 """Application Configuration Module using Pydantic Settings."""
 
 import os
-from typing import List
+from typing import Any, List, Union
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
+from pydantic import Field, field_validator
 
 
 class Settings(BaseSettings):
@@ -17,12 +17,25 @@ class Settings(BaseSettings):
     # Server Binding
     BACKEND_HOST: str = "0.0.0.0"
     BACKEND_PORT: int = 8000
-    ALLOWED_ORIGINS: List[str] = [
+    ALLOWED_ORIGINS: Union[List[str], str] = [
         "http://localhost:5173",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:3000",
     ]
+
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            if v.startswith("[") and v.endswith("]"):
+                import json
+                try:
+                    return json.loads(v)
+                except Exception:
+                    pass
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
 
     # Neo4j Graph Database
     NEO4J_URI: str = "bolt://localhost:7687"

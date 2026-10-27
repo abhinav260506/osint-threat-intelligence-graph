@@ -1,8 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
-import { Search, ShieldAlert, CheckCircle, Database } from 'lucide-react';
+import { Search, ShieldAlert, CheckCircle, Database, RefreshCw } from 'lucide-react';
 
-export const IocSearch: React.FC = () => {
+interface IocSearchProps {
+  dataVersion?: number;
+  onRefresh?: () => void;
+}
+
+export const IocSearch: React.FC<IocSearchProps> = ({ dataVersion, onRefresh }) => {
   const [iocs, setIocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -12,7 +17,7 @@ export const IocSearch: React.FC = () => {
 
   useEffect(() => {
     fetchIocs();
-  }, [selectedType]);
+  }, [selectedType, dataVersion]);
 
   const fetchIocs = async () => {
     setLoading(true);
@@ -31,16 +36,32 @@ export const IocSearch: React.FC = () => {
     fetchIocs();
   };
 
+  const handleManualRefresh = () => {
+    fetchIocs();
+    if (onRefresh) onRefresh();
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
-          <Database className="w-6 h-6 text-cyan-400" />
-          Extracted Indicators of Compromise (IoC) Registry
-        </h2>
-        <p className="text-sm text-slate-400">
-          Search, filter, and inspect normalized network observables, hashes, vulnerabilities, and ATT&CK techniques with defanging provenance.
-        </p>
+      <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
+            <Database className="w-6 h-6 text-cyan-400" />
+            Extracted Indicators of Compromise (IoC) Registry
+          </h2>
+          <p className="text-sm text-slate-400">
+            Search, filter, and inspect normalized network observables, hashes, vulnerabilities, and ATT&CK techniques with defanging provenance.
+          </p>
+        </div>
+        <button
+          onClick={handleManualRefresh}
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border cyber-glass text-slate-300 border-cyber-border hover:bg-slate-800/80 hover:text-white text-xs font-mono transition-all disabled:opacity-50 shadow-lg"
+          title="Refresh IoC Registry"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
 
       {/* Search & Filter Bar */}

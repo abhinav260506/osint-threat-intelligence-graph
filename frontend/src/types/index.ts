@@ -97,14 +97,15 @@ export interface CandidateRelationship {
 export interface EvidenceExplanation {
   entity_a: { id: string; name: string; label: string };
   entity_b: { id: string; name: string; label: string };
+  evidence_score?: number;
   evidence_summary: string[];
-  shared_infrastructure: string[];
-  shared_techniques: string[];
-  shared_tools: string[];
-  shared_cves: string[];
-  shared_sectors: string[];
-  common_reports: string[];
-  connecting_paths: string[][];
+  shared_infrastructure: any[];
+  shared_techniques: any[];
+  shared_tools?: any[];
+  shared_cves?: any[];
+  shared_sectors?: any[];
+  common_reports?: any[];
+  connecting_paths?: any[];
   assessment: string;
   classification: string;
 }

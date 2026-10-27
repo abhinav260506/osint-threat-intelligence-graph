@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { GraphCommunity, MLCluster } from '../types';
-import { Layers, Cpu, Shield, Network, ArrowRight } from 'lucide-react';
+import { Layers, Cpu, Shield, Network, ArrowRight, RefreshCw } from 'lucide-react';
 
-export const ClusterView: React.FC = () => {
+interface ClusterViewProps {
+  dataVersion?: number;
+  onRefresh?: () => void;
+}
+
+export const ClusterView: React.FC<ClusterViewProps> = ({ dataVersion, onRefresh }) => {
   const [communities, setCommunities] = useState<GraphCommunity[]>([]);
   const [mlClusters, setMlClusters] = useState<MLCluster[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -12,7 +17,7 @@ export const ClusterView: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [dataVersion]);
 
   const loadData = async () => {
     setLoading(true);
@@ -36,17 +41,33 @@ export const ClusterView: React.FC = () => {
     }
   };
 
+  const handleManualRefresh = () => {
+    loadData();
+    if (onRefresh) onRefresh();
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       {/* View Header */}
-      <div className="flex flex-col gap-1">
-        <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
-          <Layers className="w-6 h-6 text-cyan-400" />
-          Hybrid Campaign & Threat Community Clustering
-        </h2>
-        <p className="text-sm text-slate-400">
-          Comparing topological Graph Data Science (GDS Modularity) communities against Unsupervised Machine Learning (HDBSCAN feature embeddings) clusters.
-        </p>
+      <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
+            <Layers className="w-6 h-6 text-cyan-400" />
+            Hybrid Campaign & Threat Community Clustering
+          </h2>
+          <p className="text-sm text-slate-400">
+            Comparing topological Graph Data Science (GDS Modularity) communities against Unsupervised Machine Learning (HDBSCAN feature embeddings) clusters.
+          </p>
+        </div>
+        <button
+          onClick={handleManualRefresh}
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border cyber-glass text-slate-300 border-cyber-border hover:bg-slate-800/80 hover:text-white text-xs font-mono transition-all disabled:opacity-50 shadow-lg"
+          title="Refresh Clusters & Communities"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
 
       {loading ? (

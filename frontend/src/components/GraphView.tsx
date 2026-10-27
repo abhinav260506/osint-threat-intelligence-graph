@@ -14,13 +14,40 @@ import {
   Layers,
   ZoomIn,
   ZoomOut,
-  RotateCcw
+  RotateCcw,
+  Terminal,
+  Play,
+  Sparkles,
+  AlertCircle
 } from 'lucide-react';
 
 interface GraphViewProps {
   graphData: GraphData;
   onRefresh: () => void;
 }
+
+const CYPHER_TEMPLATES = [
+  {
+    name: 'Actors & Malware',
+    query: 'MATCH (a:ThreatActor)-[r:USES]->(m:Malware) RETURN a, r, m',
+  },
+  {
+    name: 'C2 Infrastructure',
+    query: 'MATCH (m:Malware)-[r:CONTACTS]->(target) RETURN m, r, target',
+  },
+  {
+    name: 'Shared Tools',
+    query: 'MATCH (a1:ThreatActor)-[r1:USES]->(t:Tool)<-[r2:USES]-(a2:ThreatActor) WHERE a1 <> a2 RETURN a1, r1, t, r2, a2',
+  },
+  {
+    name: 'Exploited CVEs',
+    query: 'MATCH (s)-[r:EXPLOITS]->(c:CVE) RETURN s, r, c',
+  },
+  {
+    name: 'Sample Graph (50)',
+    query: 'MATCH (n) OPTIONAL MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 50',
+  },
+];
 
 const LABEL_COLORS: Record<EntityLabel | string, string> = {
   ThreatActor: '#ef4444',      // Red
@@ -67,16 +94,25 @@ export const GraphView: React.FC<GraphViewProps> = ({ graphData, onRefresh }) =>
     Report: true,
   });
 
+  // Cypher Console state
+  const [customGraphData, setCustomGraphData] = useState<GraphData | null>(null);
+  const [cypherQuery, setCypherQuery] = useState<string>('MATCH (a:ThreatActor)-[r:USES]->(m:Malware) RETURN a, r, m');
+  const [isExecutingCypher, setIsExecutingCypher] = useState(false);
+  const [cypherError, setCypherError] = useState<string | null>(null);
+  const [showCypherConsole, setShowCypherConsole] = useState(false);
+
+  const activeGraphData = customGraphData || graphData;
+
   // Initialize and update Cytoscape instance
   useEffect(() => {
     if (!containerRef.current) return;
 
     // Filter elements based on type selections
-    const filteredNodes = graphData.nodes.filter(
+    const filteredNodes = activeGraphData.nodes.filter(
       (n) => selectedTypes[n.data.label] !== false
     );
     const validNodeIds = new Set(filteredNodes.map((n) => n.data.id));
-    const filteredEdges = graphData.edges.filter(
+    const filteredEdges = activeGraphData.edges.filter(
       (e) => validNodeIds.has(e.data.source) && validNodeIds.has(e.data.target)
     );
 
@@ -187,7 +223,7 @@ export const GraphView: React.FC<GraphViewProps> = ({ graphData, onRefresh }) =>
     return () => {
       cy.destroy();
     };
-  }, [graphData, selectedTypes, activeLayout]);
+  }, [activeGraphData, selectedTypes, activeLayout]);
 
   const handleZoomIn = () => cyRef.current?.zoom(cyRef.current.zoom() * 1.25);
   const handleZoomOut = () => cyRef.current?.zoom(cyRef.current.zoom() * 0.8);
@@ -195,6 +231,30 @@ export const GraphView: React.FC<GraphViewProps> = ({ graphData, onRefresh }) =>
 
   const toggleType = (type: string) => {
     setSelectedTypes((prev) => ({ ...prev, [type]: !prev[type] }));
+  };
+
+  const handleRunCypher = async (queryToRun?: string) => {
+    const q = (queryToRun || cypherQuery).trim();
+    if (!q) return;
+    setIsExecutingCypher(true);
+    setCypherError(null);
+    try {
+      const res = await api.executeCypher(q);
+      setCustomGraphData(res);
+      if (res.nodes.length === 0) {
+        setCypherError('Query executed successfully, but returned 0 nodes or edges.');
+      }
+    } catch (err: any) {
+      setCypherError(err.message || 'Failed to execute Cypher query');
+    } finally {
+      setIsExecutingCypher(false);
+    }
+  };
+
+  const handleResetGraph = () => {
+    setCustomGraphData(null);
+    setCypherError(null);
+    onRefresh();
   };
 
   const handleFindPath = async () => {
@@ -222,6 +282,36 @@ export const GraphView: React.FC<GraphViewProps> = ({ graphData, onRefresh }) =>
 
       {/* Floating Control Toolbar */}
       <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
+        <div className="flex items-center gap-2">
+          {/* Cypher Console Toggle Button */}
+          <button
+            onClick={() => setShowCypherConsole(!showCypherConsole)}
+            className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 text-xs font-mono font-medium shadow-xl transition-all ${
+              showCypherConsole || customGraphData
+                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-cyan-500/10'
+                : 'cyber-glass text-slate-300 border-cyber-border hover:bg-slate-800/80 hover:text-white'
+            }`}
+          >
+            <Terminal className="w-4 h-4 text-cyan-400" />
+            Cypher Console
+            {customGraphData && (
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+            )}
+          </button>
+
+          {/* Reset button if custom query is active */}
+          {customGraphData && (
+            <button
+              onClick={handleResetGraph}
+              className="px-2.5 py-1.5 rounded-xl border cyber-glass text-slate-300 border-cyber-border hover:bg-slate-800/80 hover:text-white text-xs font-mono flex items-center gap-1.5 shadow-xl transition-all"
+              title="Reset to full graph"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+              Reset Graph
+            </button>
+          )}
+        </div>
+
         {/* Layout Switcher */}
         <div className="cyber-glass p-2 rounded-xl border border-cyber-border flex items-center gap-1.5 shadow-xl">
           <Layers className="w-4 h-4 text-slate-400 ml-1" />
@@ -265,6 +355,105 @@ export const GraphView: React.FC<GraphViewProps> = ({ graphData, onRefresh }) =>
           </button>
         </div>
       </div>
+
+      {/* Floating Cypher Query Console Panel */}
+      {showCypherConsole && (
+        <div className="absolute top-4 left-64 cyber-glass border border-cyber-border/80 p-3.5 rounded-xl shadow-2xl z-20 w-[560px] max-w-[calc(100vw-20rem)] backdrop-blur-xl animate-in fade-in">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-cyan-400" />
+              <span className="text-xs font-bold text-slate-200 uppercase font-mono tracking-wider">
+                Cypher Query Console
+              </span>
+            </div>
+            <button
+              onClick={() => setShowCypherConsole(false)}
+              className="text-slate-400 hover:text-slate-200 p-1 rounded hover:bg-slate-800/60"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Quick Presets */}
+          <div className="flex flex-wrap items-center gap-1.5 mb-2">
+            <span className="text-[10px] font-mono text-slate-400 flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-cyan-400" /> Presets:
+            </span>
+            {CYPHER_TEMPLATES.map((tmpl) => (
+              <button
+                key={tmpl.name}
+                onClick={() => {
+                  setCypherQuery(tmpl.query);
+                  handleRunCypher(tmpl.query);
+                }}
+                className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800/80 hover:bg-slate-700/80 text-cyan-300 hover:text-white border border-slate-700/60 transition-all"
+              >
+                {tmpl.name}
+              </button>
+            ))}
+          </div>
+
+          {/* Query Editor */}
+          <div className="relative mb-2">
+            <textarea
+              value={cypherQuery}
+              onChange={(e) => setCypherQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                  handleRunCypher();
+                }
+              }}
+              rows={3}
+              placeholder="MATCH (n) RETURN n LIMIT 25"
+              className="w-full bg-[#070b14] text-cyan-300 font-mono text-xs p-2.5 rounded-lg border border-slate-700/80 focus:border-cyan-500 focus:outline-none resize-none leading-relaxed"
+            />
+            <span className="absolute bottom-2 right-2 text-[9px] font-mono text-slate-500">
+              Ctrl + Enter to run
+            </span>
+          </div>
+
+          {cypherError && (
+            <div className="p-2 mb-2 rounded bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+              <span className="font-mono text-[11px]">{cypherError}</span>
+            </div>
+          )}
+
+          {/* Action Row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleRunCypher()}
+                disabled={isExecutingCypher || !cypherQuery.trim()}
+                className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded-lg text-xs font-mono font-medium flex items-center gap-1.5 transition-all shadow-lg shadow-cyan-600/20"
+              >
+                {isExecutingCypher ? (
+                  <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                )}
+                {isExecutingCypher ? 'Running...' : 'Run Query'}
+              </button>
+
+              {customGraphData && (
+                <button
+                  onClick={handleResetGraph}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-mono flex items-center gap-1.5 border border-slate-700 transition-all"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Full Graph
+                </button>
+              )}
+            </div>
+
+            {customGraphData && (
+              <span className="text-[11px] font-mono text-cyan-400">
+                {customGraphData.stats?.total_nodes || 0} nodes, {customGraphData.stats?.total_edges || 0} edges
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Type Legend & Filter Overlay */}
       <div className="absolute bottom-4 left-4 cyber-glass p-3 rounded-xl border border-cyber-border shadow-2xl max-w-md z-10">

@@ -16,10 +16,7 @@ export const App: React.FC = () => {
     stats: { total_nodes: 0, total_edges: 0 },
   });
   const [isSeeding, setIsSeeding] = useState<boolean>(false);
-
-  useEffect(() => {
-    loadGraphData();
-  }, []);
+  const [dataVersion, setDataVersion] = useState<number>(0);
 
   const loadGraphData = async () => {
     try {
@@ -30,11 +27,20 @@ export const App: React.FC = () => {
     }
   };
 
+  const refreshAll = async () => {
+    await loadGraphData();
+    setDataVersion((v) => v + 1);
+  };
+
+  useEffect(() => {
+    loadGraphData();
+  }, []);
+
   const handleSeed = async () => {
     setIsSeeding(true);
     try {
       await api.seedBenchmarks();
-      await loadGraphData();
+      await refreshAll();
     } catch (e) {
       console.error('Failed to seed:', e);
     } finally {
@@ -48,23 +54,29 @@ export const App: React.FC = () => {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         stats={graphData.stats}
-        onRefresh={loadGraphData}
+        onRefresh={refreshAll}
         onSeed={handleSeed}
         isSeeding={isSeeding}
       />
 
       <main className="flex-1 w-full overflow-hidden">
         {activeTab === 'graph' && (
-          <GraphView graphData={graphData} onRefresh={loadGraphData} />
+          <GraphView graphData={graphData} onRefresh={refreshAll} />
         )}
-        {activeTab === 'clusters' && <ClusterView />}
-        {activeTab === 'prediction' && <LinkPredictionView />}
-        {activeTab === 'iocs' && <IocSearch />}
+        {activeTab === 'clusters' && (
+          <ClusterView dataVersion={dataVersion} onRefresh={refreshAll} />
+        )}
+        {activeTab === 'prediction' && (
+          <LinkPredictionView dataVersion={dataVersion} onRefresh={refreshAll} />
+        )}
+        {activeTab === 'iocs' && (
+          <IocSearch dataVersion={dataVersion} onRefresh={refreshAll} />
+        )}
         {activeTab === 'ingestion' && (
           <IngestionWorkbench
-            onIngested={loadGraphData}
+            onIngested={refreshAll}
             onNavigateToGraph={() => {
-              loadGraphData();
+              refreshAll();
               setActiveTab('graph');
             }}
           />

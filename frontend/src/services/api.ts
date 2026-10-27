@@ -14,6 +14,19 @@ export const api = {
     return res.json();
   },
 
+  async executeCypher(query: string): Promise<GraphData> {
+    const res = await fetch(`${API_BASE}/graph/cypher`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to execute Cypher query');
+    }
+    return res.json();
+  },
+
   async getEntity(nodeId: string) {
     const res = await fetch(`${API_BASE}/graph/entity/${encodeURIComponent(nodeId)}`);
     if (!res.ok) throw new Error('Failed to fetch entity details');

@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { CandidateRelationship, EvidenceExplanation } from '../types';
-import { Sparkles, ArrowRight, ShieldCheck, FileCheck, CheckCircle2, AlertTriangle, X } from 'lucide-react';
+import { Sparkles, ArrowRight, ShieldCheck, FileCheck, CheckCircle2, AlertTriangle, X, RefreshCw } from 'lucide-react';
 
-export const LinkPredictionView: React.FC = () => {
+interface LinkPredictionViewProps {
+  dataVersion?: number;
+  onRefresh?: () => void;
+}
+
+export const LinkPredictionView: React.FC<LinkPredictionViewProps> = ({ dataVersion, onRefresh }) => {
   const [candidates, setCandidates] = useState<CandidateRelationship[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateRelationship | null>(null);
@@ -12,7 +17,7 @@ export const LinkPredictionView: React.FC = () => {
 
   useEffect(() => {
     loadPredictions();
-  }, []);
+  }, [dataVersion]);
 
   const loadPredictions = async () => {
     setLoading(true);
@@ -24,6 +29,11 @@ export const LinkPredictionView: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleManualRefresh = () => {
+    loadPredictions();
+    if (onRefresh) onRefresh();
   };
 
   const handleInspect = async (cand: CandidateRelationship) => {
@@ -41,14 +51,25 @@ export const LinkPredictionView: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
-          <Sparkles className="w-6 h-6 text-cyan-400" />
-          Potential Relationship Discovery & Link Prediction
-        </h2>
-        <p className="text-sm text-slate-400">
-          Uncovering hidden, unobserved correlations between malware, campaigns, and infrastructure using Cosine Similarity on high-dimensional threat profiles and Graph Topology.
-        </p>
+      <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
+            <Sparkles className="w-6 h-6 text-cyan-400" />
+            Potential Relationship Discovery & Link Prediction
+          </h2>
+          <p className="text-sm text-slate-400">
+            Uncovering hidden, unobserved correlations between malware, campaigns, and infrastructure using Cosine Similarity on high-dimensional threat profiles and Graph Topology.
+          </p>
+        </div>
+        <button
+          onClick={handleManualRefresh}
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border cyber-glass text-slate-300 border-cyber-border hover:bg-slate-800/80 hover:text-white text-xs font-mono transition-all disabled:opacity-50 shadow-lg"
+          title="Refresh Link Predictions"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
 
       {loading ? (
@@ -146,52 +167,102 @@ export const LinkPredictionView: React.FC = () => {
                     Supporting Verifiable Evidence:
                   </span>
                   <div className="space-y-1.5">
-                    {explanation.evidence_summary.map((bullet, idx) => (
+                    {(explanation.evidence_summary || []).map((bullet: any, idx: number) => (
                       <div
                         key={idx}
                         className="flex items-start gap-2 p-2 rounded bg-slate-900/80 border border-cyber-border text-slate-300"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                        <span>{bullet}</span>
+                        <span>{typeof bullet === 'string' ? bullet : bullet?.text || JSON.stringify(bullet)}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
                 {/* Shared Infra */}
-                {explanation.shared_infrastructure.length > 0 && (
+                {explanation.shared_infrastructure && explanation.shared_infrastructure.length > 0 && (
                   <div>
                     <span className="text-slate-400 uppercase font-semibold block mb-1 text-[11px]">
                       Overlapping Infrastructure:
                     </span>
                     <div className="flex flex-wrap gap-1">
-                      {explanation.shared_infrastructure.map((infra, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px]"
-                        >
-                          {infra}
-                        </span>
-                      ))}
+                      {explanation.shared_infrastructure.map((infra: any, idx: number) => {
+                        const val = typeof infra === 'string' ? infra : infra?.name || JSON.stringify(infra);
+                        return (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px]"
+                          >
+                            {val}
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
 
                 {/* Shared TTPs */}
-                {explanation.shared_techniques.length > 0 && (
+                {explanation.shared_techniques && explanation.shared_techniques.length > 0 && (
                   <div>
                     <span className="text-slate-400 uppercase font-semibold block mb-1 text-[11px]">
                       Overlapping ATT&CK Techniques:
                     </span>
                     <div className="flex flex-wrap gap-1">
-                      {explanation.shared_techniques.map((tech, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[10px]"
-                        >
-                          {tech}
-                        </span>
-                      ))}
+                      {explanation.shared_techniques.map((tech: any, idx: number) => {
+                        const val = typeof tech === 'string' ? tech : tech?.name || JSON.stringify(tech);
+                        return (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[10px]"
+                          >
+                            {val}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Shared Tools */}
+                {explanation.shared_tools && explanation.shared_tools.length > 0 && (
+                  <div>
+                    <span className="text-slate-400 uppercase font-semibold block mb-1 text-[11px]">
+                      Overlapping Tools & Malware:
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {explanation.shared_tools.map((tool: any, idx: number) => {
+                        const val = typeof tool === 'string' ? tool : tool?.name || JSON.stringify(tool);
+                        return (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20 text-[10px]"
+                          >
+                            {val}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Shared CVEs */}
+                {explanation.shared_cves && explanation.shared_cves.length > 0 && (
+                  <div>
+                    <span className="text-slate-400 uppercase font-semibold block mb-1 text-[11px]">
+                      Overlapping CVEs:
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {explanation.shared_cves.map((cve: any, idx: number) => {
+                        const val = typeof cve === 'string' ? cve : cve?.name || JSON.stringify(cve);
+                        return (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[10px]"
+                          >
+                            {val}
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

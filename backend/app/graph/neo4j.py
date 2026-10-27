@@ -15,15 +15,16 @@ class Neo4jConnectionManager:
         self._is_available: bool = False
 
     def connect(self) -> bool:
-        """Initializes connection to Neo4j."""
+        """Initializes or restores connection to Neo4j."""
         try:
-            self._driver = GraphDatabase.driver(
-                settings.NEO4J_URI,
-                auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD),
-                max_connection_lifetime=30 * 60,
-                max_connection_pool_size=50,
-                connection_acquisition_timeout=5.0,
-            )
+            if self._driver is None:
+                self._driver = GraphDatabase.driver(
+                    settings.NEO4J_URI,
+                    auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD),
+                    max_connection_lifetime=30 * 60,
+                    max_connection_pool_size=50,
+                    connection_acquisition_timeout=5.0,
+                )
             self._driver.verify_connectivity()
             self._is_available = True
             logger.info("Successfully connected to Neo4j Threat Knowledge Graph.")
@@ -31,6 +32,12 @@ class Neo4jConnectionManager:
             return True
         except Exception as e:
             self._is_available = False
+            if self._driver:
+                try:
+                    self._driver.close()
+                except Exception:
+                    pass
+                self._driver = None
             logger.warning(f"Neo4j is currently unreachable ({e}). In-memory graph engine will be active.")
             return False
 
@@ -71,6 +78,58 @@ class Neo4jConnectionManager:
             logger.error(f"Error executing Cypher query: {e}")
             return []
 
+    def execute_cypher_to_graph(self, query: str, parameters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Executes a Cypher query and transforms returned nodes, relationships, and paths into Cytoscape format."""
+        if not self._driver or not self._is_available:
+            return {"nodes": [], "edges": [], "stats": {"total_nodes": 0, "total_edges": 0}}
+
+        from neo4j.graph import Node, Relationship, Path
+
+        parameters = parameters or {}
+        nodes_map: Dict[str, Dict[str, Any]] = {}
+        edges_map: Dict[str, Dict[str, Any]] = {}
+
+        def process_val(val: Any):
+            if isinstance(val, Node):
+                nid = str(val.get("id") or val.element_id)
+                lbl = list(val.labels)[0] if val.labels else "Entity"
+                name = str(val.get("name") or val.get("value") or nid)
+                props = dict(val)
+                props.update({"id": nid, "label": lbl, "name": name})
+                nodes_map[nid] = {"data": props}
+            elif isinstance(val, Relationship):
+                eid = str(val.element_id)
+                src = str(val.start_node.get("id") or val.start_node.element_id)
+                tgt = str(val.end_node.get("id") or val.end_node.element_id)
+                process_val(val.start_node)
+                process_val(val.end_node)
+                props = dict(val)
+                props.update({"id": eid, "source": src, "target": tgt, "rel_type": val.type})
+                edges_map[eid] = {"data": props}
+            elif isinstance(val, Path):
+                for n in val.nodes:
+                    process_val(n)
+                for r in val.relationships:
+                    process_val(r)
+            elif isinstance(val, list):
+                for item in val:
+                    process_val(item)
+            elif isinstance(val, dict):
+                for item in val.values():
+                    process_val(item)
+
+        with self._driver.session(database=settings.NEO4J_DATABASE) as session:
+            result = session.run(query, parameters)
+            for record in result:
+                for v in record.values():
+                    process_val(v)
+
+        return {
+            "nodes": list(nodes_map.values()),
+            "edges": list(edges_map.values()),
+            "stats": {"total_nodes": len(nodes_map), "total_edges": len(edges_map)},
+        }
+
     def close(self):
         """Closes the driver connection."""
         if self._driver:
@@ -79,6 +138,8 @@ class Neo4jConnectionManager:
 
     @property
     def is_available(self) -> bool:
+        if not self._is_available:
+            self.connect()
         return self._is_available
 
 
