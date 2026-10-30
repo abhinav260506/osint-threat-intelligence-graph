@@ -24,6 +24,7 @@ import {
 interface GraphViewProps {
   graphData: GraphData;
   onRefresh: () => void;
+  focusNodeId?: string | null;
 }
 
 const CYPHER_TEMPLATES = [
@@ -64,7 +65,7 @@ const LABEL_COLORS: Record<EntityLabel | string, string> = {
   Report: '#6366f1',           // Indigo
 };
 
-export const GraphView: React.FC<GraphViewProps> = ({ graphData, onRefresh }) => {
+export const GraphView: React.FC<GraphViewProps> = ({ graphData, onRefresh, focusNodeId }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
 
@@ -220,10 +221,32 @@ export const GraphView: React.FC<GraphViewProps> = ({ graphData, onRefresh }) =>
 
     cyRef.current = cy;
 
+    if (focusNodeId) {
+      setTimeout(() => {
+        if (!cyRef.current) return;
+        const target = cyRef.current.$id(focusNodeId);
+        if (target && target.length > 0) {
+          cyRef.current.animate({
+            center: { eles: target },
+            zoom: 1.5,
+            duration: 600,
+          });
+          target.select();
+          const data = target.data();
+          setSelectedNode(data);
+          setIsLoadingNeighbors(true);
+          api.getEntity(data.id)
+            .then((details) => setNodeNeighbors(details.neighbors || []))
+            .catch(console.error)
+            .finally(() => setIsLoadingNeighbors(false));
+        }
+      }, 400);
+    }
+
     return () => {
       cy.destroy();
     };
-  }, [activeGraphData, selectedTypes, activeLayout]);
+  }, [activeGraphData, selectedTypes, activeLayout, focusNodeId]);
 
   const handleZoomIn = () => cyRef.current?.zoom(cyRef.current.zoom() * 1.25);
   const handleZoomOut = () => cyRef.current?.zoom(cyRef.current.zoom() * 0.8);

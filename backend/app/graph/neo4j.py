@@ -1,5 +1,6 @@
 """Neo4j Driver Connection Manager and Cypher Execution Layer."""
 
+import time
 from typing import Any, Dict, List, Optional
 import neo4j
 from neo4j import GraphDatabase, Driver
@@ -13,9 +14,14 @@ class Neo4jConnectionManager:
     def __init__(self):
         self._driver: Optional[Driver] = None
         self._is_available: bool = False
+        self._last_attempt_time: float = 0.0
 
-    def connect(self) -> bool:
+    def connect(self, force: bool = False) -> bool:
         """Initializes or restores connection to Neo4j."""
+        now = time.time()
+        if not force and not self._is_available and (now - self._last_attempt_time < 30.0):
+            return False
+        self._last_attempt_time = now
         try:
             if self._driver is None:
                 self._driver = GraphDatabase.driver(

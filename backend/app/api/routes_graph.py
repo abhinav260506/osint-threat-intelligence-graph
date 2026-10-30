@@ -58,17 +58,18 @@ class CypherQueryRequest(BaseModel):
 
 @router.post("/cypher")
 async def execute_custom_cypher(payload: CypherQueryRequest):
-    """Executes a custom Cypher query against Neo4j and returns Cytoscape-formatted graph elements."""
+    """Executes a custom Cypher query against Neo4j or in-memory fallback and returns Cytoscape-formatted graph elements."""
     from backend.app.graph.neo4j import neo4j_manager
+    from backend.app.core.logging import logger
 
-    if not neo4j_manager.is_available:
-        raise HTTPException(
-            status_code=503,
-            detail="Neo4j database is currently disconnected. Please verify connection in .env.",
-        )
+    if neo4j_manager.is_available:
+        try:
+            return neo4j_manager.execute_cypher_to_graph(payload.query)
+        except Exception as e:
+            logger.warning(f"Neo4j Cypher failed, attempting in-memory fallback: {e}")
 
     try:
-        result = neo4j_manager.execute_cypher_to_graph(payload.query)
+        result = knowledge_graph.execute_cypher(payload.query)
         return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Cypher execution failed: {str(e)}")

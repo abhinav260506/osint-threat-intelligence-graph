@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import cytoscape from 'cytoscape';
 import { api } from '../services/api';
-import { IngestionResult, EntityLabel } from '../types';
+import { IngestionResult, EntityLabel, GraphData, GraphNode, GraphEdge } from '../types';
 import { 
   FileText, 
   Upload, 
@@ -22,12 +22,18 @@ import {
   ExternalLink,
   Maximize2,
   ZoomIn,
-  ZoomOut
+  ZoomOut,
+  Terminal,
+  Play,
+  RotateCcw,
+  X,
+  Info,
+  Database
 } from 'lucide-react';
 
 interface IngestionWorkbenchProps {
   onIngested: () => void;
-  onNavigateToGraph?: () => void;
+  onNavigateToGraph?: (nodeId?: string) => void;
 }
 
 const LABEL_COLORS: Record<EntityLabel | string, string> = {
@@ -44,6 +50,140 @@ const LABEL_COLORS: Record<EntityLabel | string, string> = {
   Sector: '#ec4899',           // Pink
   Report: '#6366f1',           // Indigo
 };
+
+const REPORT_CYPHER_TEMPLATES = [
+  {
+    name: 'All Nodes',
+    query: 'MATCH (n) RETURN n',
+    desc: 'Retrieve all entities and relationships in this report',
+  },
+  {
+    name: 'Threat Actors',
+    query: 'MATCH (a:ThreatActor) RETURN a',
+    desc: 'Isolate threat actors & APT groups',
+  },
+  {
+    name: 'Actors & Tools / Malware',
+    query: 'MATCH (a:ThreatActor)-[r]->(t) RETURN a, r, t',
+    desc: 'Trace actor connections to malware and techniques',
+  },
+  {
+    name: 'C2 Infrastructure',
+    query: "MATCH (n) WHERE n.label IN ['IP', 'Domain', 'URL'] RETURN n",
+    desc: 'Filter to IP addresses, C2 domains, and URLs',
+  },
+  {
+    name: 'CVEs (Vulnerabilities)',
+    query: 'MATCH (n:CVE) RETURN n',
+    desc: 'Exploited CVE numbers mentioned in this report',
+  },
+  {
+    name: 'ATT&CK Techniques',
+    query: 'MATCH (n:AttackTechnique) RETURN n',
+    desc: 'MITRE ATT&CK techniques used in this campaign',
+  },
+  {
+    name: 'Target Sectors',
+    query: 'MATCH (n:Sector) RETURN n',
+    desc: 'Targeted industries and victim sectors',
+  },
+];
+
+/**
+ * Fast client-side Cypher evaluator for filtering the specific ingested report subgraph.
+ */
+function evaluateSubgraphCypher(
+  query: string,
+  fullSubgraph: { nodes: GraphNode[]; edges: GraphEdge[] }
+): GraphData {
+  const q = query.trim();
+  const limitMatch = q.match(/LIMIT\s+(\d+)/i);
+  const limit = limitMatch ? parseInt(limitMatch[1], 10) : 500;
+
+  // Relationship pattern: MATCH (a:Label1)-[r:REL_TYPE]->(b:Label2) or MATCH (a)-[r]->(b)
+  const relPattern = q.match(
+    /MATCH\s*\((?:(\w+))?(?::(\w+))?\)\s*-\s*\[(?:(\w+))?(?::(\w+))?\]\s*->?\s*\((?:(\w+))?(?::(\w+))?\)/i
+  );
+
+  const matchedNodeMap = new Map<string, GraphNode>();
+  const matchedEdgeMap = new Map<string, GraphEdge>();
+
+  if (relPattern) {
+    const [, , srcLabel, , relType, , tgtLabel] = relPattern;
+    const nodeById = new Map<string, GraphNode>();
+    fullSubgraph.nodes.forEach((n) => nodeById.set(n.data.id, n));
+
+    for (const e of fullSubgraph.edges) {
+      const srcNode = nodeById.get(e.data.source);
+      const tgtNode = nodeById.get(e.data.target);
+      if (!srcNode || !tgtNode) continue;
+
+      if (srcLabel && srcNode.data.label?.toLowerCase() !== srcLabel.toLowerCase()) continue;
+      if (tgtLabel && tgtNode.data.label?.toLowerCase() !== tgtLabel.toLowerCase()) continue;
+
+      const edgeRel = (e.data.rel_type || e.data.label || '').toUpperCase();
+      if (relType && edgeRel !== relType.toUpperCase()) continue;
+
+      matchedNodeMap.set(srcNode.data.id, srcNode);
+      matchedNodeMap.set(tgtNode.data.id, tgtNode);
+      matchedEdgeMap.set(e.data.id, e);
+
+      if (matchedNodeMap.size >= limit) break;
+    }
+  } else {
+    // Single node pattern: MATCH (n:Label) or MATCH (n)
+    const nodePattern = q.match(/MATCH\s*\((?:(\w+))?(?::(\w+))?\)/i);
+    const targetLabel = nodePattern ? nodePattern[2] : null;
+
+    // Check WHERE clause
+    const whereMatch = q.match(/WHERE\s+(.+?)(?:\s+RETURN|\s+LIMIT|$)/i);
+    const whereStr = whereMatch ? whereMatch[1] : '';
+
+    let inLabels: string[] | null = null;
+    const inMatch = whereStr.match(/\.label\s+IN\s+\[(.*?)\]/i);
+    if (inMatch) {
+      inLabels = inMatch[1].split(',').map((s) => s.trim().replace(/['"]/g, '').toLowerCase());
+    }
+
+    let containsVal: string | null = null;
+    const containsMatch = whereStr.match(/\.(?:name|value)\s+CONTAINS\s+['"](.*?)['"]/i);
+    if (containsMatch) {
+      containsVal = containsMatch[1].toLowerCase();
+    }
+
+    for (const n of fullSubgraph.nodes) {
+      const nData = n.data;
+      const nLabel = nData.label || 'Entity';
+
+      if (targetLabel && nLabel.toLowerCase() !== targetLabel.toLowerCase()) continue;
+      if (inLabels && !inLabels.includes(nLabel.toLowerCase())) continue;
+      if (containsVal) {
+        const nameVal = String(nData.name || '').toLowerCase();
+        const rawVal = String(nData.value || '').toLowerCase();
+        if (!nameVal.includes(containsVal) && !rawVal.includes(containsVal)) continue;
+      }
+
+      matchedNodeMap.set(nData.id, n);
+      if (matchedNodeMap.size >= limit) break;
+    }
+
+    // Connect edges between matched nodes
+    for (const e of fullSubgraph.edges) {
+      if (matchedNodeMap.has(e.data.source) && matchedNodeMap.has(e.data.target)) {
+        matchedEdgeMap.set(e.data.id, e);
+      }
+    }
+  }
+
+  const nodes = Array.from(matchedNodeMap.values());
+  const edges = Array.from(matchedEdgeMap.values());
+
+  return {
+    nodes,
+    edges,
+    stats: { total_nodes: nodes.length, total_edges: edges.length },
+  };
+}
 
 export const IngestionWorkbench: React.FC<IngestionWorkbenchProps> = ({ onIngested, onNavigateToGraph }) => {
   const [inputMode, setInputMode] = useState<'paste' | 'upload'>('paste');
@@ -64,6 +204,128 @@ export const IngestionWorkbench: React.FC<IngestionWorkbenchProps> = ({ onIngest
   const cySubRef = useRef<HTMLDivElement>(null);
   const cyInstanceRef = useRef<cytoscape.Core | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Cypher Console & Interactive Subgraph States
+  const [showCypherConsole, setShowCypherConsole] = useState(false);
+  const [cypherQuery, setCypherQuery] = useState('MATCH (n) RETURN n');
+  const [cypherScope, setCypherScope] = useState<'subgraph' | 'master'>('subgraph');
+  const [isExecutingCypher, setIsExecutingCypher] = useState(false);
+  const [cypherError, setCypherError] = useState<string | null>(null);
+  const [customSubgraphData, setCustomSubgraphData] = useState<GraphData | null>(null);
+  const [subgraphLayout, setSubgraphLayout] = useState<'concentric' | 'cose' | 'circle' | 'breadthfirst'>('concentric');
+  const [retrievedInfo, setRetrievedInfo] = useState<{ nodes: GraphNode[]; edges: GraphEdge[] } | null>(null);
+  const [showRetrievedDrawer, setShowRetrievedDrawer] = useState(false);
+
+  const activeSubgraph = customSubgraphData || result?.generated_subgraph;
+
+  const getSubgraphLayoutConfig = (layoutName: string) => {
+    switch (layoutName) {
+      case 'concentric':
+        return {
+          name: 'concentric',
+          concentric: (node: any) => {
+            if (node.data('label') === 'Report') return 10;
+            if (node.data('label') === 'ThreatActor' || node.data('label') === 'Campaign') return 7;
+            if (node.data('label') === 'Malware') return 5;
+            return 2;
+          },
+          levelWidth: () => 2,
+          padding: 25,
+          animate: true,
+          animationDuration: 400,
+        };
+      case 'cose':
+        return {
+          name: 'cose',
+          animate: true,
+          animationDuration: 450,
+          padding: 25,
+          nodeRepulsion: () => 400000,
+          idealEdgeLength: () => 65,
+        };
+      case 'circle':
+        return {
+          name: 'circle',
+          padding: 25,
+          animate: true,
+          animationDuration: 400,
+        };
+      case 'breadthfirst':
+        return {
+          name: 'breadthfirst',
+          directed: true,
+          padding: 25,
+          animate: true,
+          animationDuration: 400,
+        };
+      default:
+        return { name: 'concentric', padding: 25 };
+    }
+  };
+
+  const handleLayoutChange = (layoutName: 'concentric' | 'cose' | 'circle' | 'breadthfirst') => {
+    setSubgraphLayout(layoutName);
+    if (cyInstanceRef.current) {
+      cyInstanceRef.current.layout(getSubgraphLayoutConfig(layoutName) as any).run();
+    }
+  };
+
+  const handleZoomIn = () => cyInstanceRef.current?.zoom(cyInstanceRef.current.zoom() * 1.25);
+  const handleZoomOut = () => cyInstanceRef.current?.zoom(cyInstanceRef.current.zoom() * 0.8);
+  const handleFit = () => cyInstanceRef.current?.fit(undefined, 30);
+
+  const handleFocusNode = (nodeId: string) => {
+    if (!cyInstanceRef.current) return;
+    const target = cyInstanceRef.current.$id(nodeId);
+    if (target && target.length > 0) {
+      cyInstanceRef.current.animate({
+        center: { eles: target },
+        zoom: 1.8,
+        duration: 400,
+      });
+      target.select();
+    }
+  };
+
+  const handleRunSubgraphCypher = async (queryToRun?: string) => {
+    const q = (queryToRun || cypherQuery).trim();
+    if (!q || !result?.generated_subgraph) return;
+
+    setIsExecutingCypher(true);
+    setCypherError(null);
+
+    try {
+      let res: GraphData;
+      if (cypherScope === 'subgraph') {
+        res = evaluateSubgraphCypher(q, result.generated_subgraph);
+      } else {
+        res = await api.executeCypher(q);
+      }
+
+      setCustomSubgraphData(res);
+      setRetrievedInfo({ nodes: res.nodes, edges: res.edges });
+      setShowRetrievedDrawer(true);
+
+      if (res.nodes.length === 0) {
+        setCypherError(
+          cypherScope === 'subgraph'
+            ? 'Query executed, but 0 entities in this report graph matched.'
+            : 'Query executed against database, but returned 0 results.'
+        );
+      }
+    } catch (err: any) {
+      setCypherError(err.message || 'Failed to execute Cypher query');
+    } finally {
+      setIsExecutingCypher(false);
+    }
+  };
+
+  const handleResetSubgraph = () => {
+    setCustomSubgraphData(null);
+    setRetrievedInfo(null);
+    setCypherError(null);
+    setShowRetrievedDrawer(false);
+  };
 
   const sampleSnippets = [
     {
@@ -105,13 +367,13 @@ Techniques: T1566 (Phishing) and T1059.`,
     { label: 'GDS & ML Analytics', desc: 'Clustering, Link Prediction, Evidence' },
   ];
 
-  // Render Subgraph when analysis completes or tab changes to graph
+  // Render Subgraph when analysis completes or tab changes to graph or custom query updates
   useEffect(() => {
-    if (!result?.generated_subgraph || activeResultTab !== 'graph' || !cySubRef.current) {
+    if (!activeSubgraph || activeResultTab !== 'graph' || !cySubRef.current) {
       return;
     }
 
-    const { nodes, edges } = result.generated_subgraph;
+    const { nodes, edges } = activeSubgraph;
 
     const cy = cytoscape({
       container: cySubRef.current,
@@ -153,6 +415,15 @@ Techniques: T1566 (Phishing) and T1059.`,
           } as any,
         },
         {
+          selector: 'node:selected',
+          style: {
+            'border-color': '#38bdf8',
+            'border-width': 4,
+            'shadow-blur': 14,
+            'shadow-color': '#38bdf8',
+          } as any,
+        },
+        {
           selector: 'edge',
           style: {
             'label': 'data(label)',
@@ -170,19 +441,7 @@ Techniques: T1566 (Phishing) and T1059.`,
           } as any,
         },
       ],
-      layout: {
-        name: 'concentric',
-        concentric: (node: any) => {
-          if (node.data('label') === 'Report') return 10;
-          if (node.data('label') === 'ThreatActor' || node.data('label') === 'Campaign') return 7;
-          if (node.data('label') === 'Malware') return 5;
-          return 2;
-        },
-        levelWidth: () => 2,
-        padding: 20,
-        animate: true,
-        animationDuration: 400,
-      } as any,
+      layout: getSubgraphLayoutConfig(subgraphLayout) as any,
     });
 
     cyInstanceRef.current = cy;
@@ -190,7 +449,7 @@ Techniques: T1566 (Phishing) and T1059.`,
     return () => {
       cy.destroy();
     };
-  }, [result, activeResultTab]);
+  }, [result, customSubgraphData, activeResultTab]);
 
   const handleApplyTemplate = (snippet: typeof sampleSnippets[0]) => {
     setInputMode('paste');
@@ -218,6 +477,11 @@ Techniques: T1566 (Phishing) and T1059.`,
     setIsAnalyzing(true);
     setError(null);
     setResult(null);
+    setCustomSubgraphData(null);
+    setRetrievedInfo(null);
+    setCypherError(null);
+    setShowCypherConsole(false);
+    setShowRetrievedDrawer(false);
     setActiveStep(0);
 
     // Step 1: Input Validation
@@ -505,8 +769,10 @@ Techniques: T1566 (Phishing) and T1059.`,
             </h3>
             {result && onNavigateToGraph && (
               <button
-                onClick={onNavigateToGraph}
-                className="flex items-center gap-1.5 text-xs font-mono text-cyan-300 hover:text-cyan-200 px-3 py-1.5 rounded-lg bg-cyan-950 border border-cyan-800 shadow-md transition-all font-semibold"
+                type="button"
+                onClick={() => onNavigateToGraph(result.report_id)}
+                className="flex items-center gap-1.5 text-xs font-mono text-cyan-300 hover:text-white px-3 py-1.5 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-700/80 hover:border-cyan-500 shadow-lg shadow-cyan-950/50 transition-all font-semibold cursor-pointer active:scale-95"
+                title="Expand and navigate to Main Threat Graph"
               >
                 <span>Expand Master Threat Graph</span>
                 <ExternalLink className="w-3.5 h-3.5" />
@@ -619,13 +885,318 @@ Techniques: T1566 (Phishing) and T1059.`,
                 )}
               </div>
 
-              {/* Tab 0: Interactive Generated Subgraph Canvas */}
+              {/* Tab 0: Interactive Generated Subgraph Canvas & Cypher Console */}
               {activeResultTab === 'graph' && (
-                <div className="relative w-full h-80 rounded-xl overflow-hidden border border-cyber-border bg-[#080c14]">
-                  <div ref={cySubRef} className="w-full h-full" />
+                <div className="relative w-full h-[520px] rounded-xl overflow-hidden border border-cyber-border bg-[#080c14] flex flex-col">
+                  {/* Floating Controls Toolbar */}
+                  <div className="absolute top-3 left-3 flex flex-col gap-2 z-10">
+                    <div className="flex items-center gap-2">
+                      {/* Cypher Console Toggle Button */}
+                      <button
+                        type="button"
+                        onClick={() => setShowCypherConsole(!showCypherConsole)}
+                        className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 text-xs font-mono font-medium shadow-xl transition-all ${
+                          showCypherConsole || customSubgraphData
+                            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-cyan-500/10'
+                            : 'cyber-glass text-slate-300 border-cyber-border hover:bg-slate-800/80 hover:text-white'
+                        }`}
+                      >
+                        <Terminal className="w-4 h-4 text-cyan-400" />
+                        <span>Cypher Console</span>
+                        {customSubgraphData && (
+                          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                        )}
+                      </button>
+
+                      {/* Expand to Main Threat Graph Button */}
+                      {onNavigateToGraph && (
+                        <button
+                          type="button"
+                          onClick={() => onNavigateToGraph(result.report_id)}
+                          className="px-3 py-1.5 rounded-xl border cyber-glass text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/20 hover:text-white text-xs font-mono flex items-center gap-1.5 shadow-xl transition-all font-semibold"
+                          title="Expand and open in the Main Threat Graph"
+                        >
+                          <Maximize2 className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Expand to Main Graph</span>
+                        </button>
+                      )}
+
+                      {/* Reset button if custom query is active */}
+                      {customSubgraphData && (
+                        <button
+                          onClick={handleResetSubgraph}
+                          className="px-2.5 py-1.5 rounded-xl border cyber-glass text-slate-300 border-cyber-border hover:bg-slate-800/80 hover:text-white text-xs font-mono flex items-center gap-1.5 shadow-xl transition-all"
+                          title="Reset to full report graph"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Full Subgraph ({result.generated_subgraph?.nodes.length || 0})</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Layout Switcher */}
+                    <div className="cyber-glass p-1.5 rounded-xl border border-cyber-border flex items-center gap-1 shadow-xl">
+                      <Layers className="w-3.5 h-3.5 text-slate-400 ml-1 mr-0.5" />
+                      {(['concentric', 'cose', 'circle', 'breadthfirst'] as const).map((l) => (
+                        <button
+                          key={l}
+                          onClick={() => handleLayoutChange(l)}
+                          className={`px-2 py-0.5 rounded text-[11px] font-mono capitalize transition-all ${
+                            subgraphLayout === l
+                              ? 'bg-blue-600 text-white font-semibold'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                          }`}
+                        >
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Zoom & Fit Controls */}
+                    <div className="cyber-glass p-1 rounded-xl border border-cyber-border flex items-center gap-1 w-fit shadow-xl">
+                      <button
+                        onClick={handleZoomIn}
+                        title="Zoom In"
+                        className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 rounded"
+                      >
+                        <ZoomIn className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={handleZoomOut}
+                        title="Zoom Out"
+                        className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 rounded"
+                      >
+                        <ZoomOut className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={handleFit}
+                        title="Fit to Screen"
+                        className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 rounded"
+                      >
+                        <Maximize2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Floating Cypher Query Console Panel */}
+                  {showCypherConsole && (
+                    <div className="absolute top-3 left-48 cyber-glass border border-cyber-border/80 p-3.5 rounded-xl shadow-2xl z-20 w-[580px] max-w-[calc(100%-13rem)] backdrop-blur-xl animate-in fade-in max-h-[480px] overflow-y-auto">
+                      {/* Panel Header */}
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Terminal className="w-4 h-4 text-cyan-400" />
+                          <span className="text-xs font-bold text-slate-200 uppercase font-mono tracking-wider">
+                            Cypher Query Console
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {/* Scope Toggle */}
+                          <div className="flex items-center rounded-lg bg-slate-900 border border-slate-700/80 p-0.5 text-[10px] font-mono">
+                            <button
+                              type="button"
+                              onClick={() => setCypherScope('subgraph')}
+                              className={`px-2 py-0.5 rounded transition-all ${
+                                cypherScope === 'subgraph'
+                                  ? 'bg-cyan-600 text-white font-semibold'
+                                  : 'text-slate-400 hover:text-slate-200'
+                              }`}
+                              title="Query entities in this generated report graph"
+                            >
+                              This Report
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCypherScope('master')}
+                              className={`px-2 py-0.5 rounded transition-all ${
+                                cypherScope === 'master'
+                                  ? 'bg-blue-600 text-white font-semibold'
+                                  : 'text-slate-400 hover:text-slate-200'
+                              }`}
+                              title="Query the platform master threat graph database"
+                            >
+                              Master DB
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setShowCypherConsole(false)}
+                            className="text-slate-400 hover:text-slate-200 p-1 rounded hover:bg-slate-800/60"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Quick Presets */}
+                      <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+                        <span className="text-[10px] font-mono text-slate-400 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-cyan-400" /> Presets:
+                        </span>
+                        {REPORT_CYPHER_TEMPLATES.map((tmpl) => (
+                          <button
+                            key={tmpl.name}
+                            type="button"
+                            onClick={() => {
+                              setCypherQuery(tmpl.query);
+                              handleRunSubgraphCypher(tmpl.query);
+                            }}
+                            title={tmpl.desc}
+                            className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800/80 hover:bg-slate-700/80 text-cyan-300 hover:text-white border border-slate-700/60 transition-all"
+                          >
+                            {tmpl.name}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Query Editor */}
+                      <div className="relative mb-2">
+                        <textarea
+                          value={cypherQuery}
+                          onChange={(e) => setCypherQuery(e.target.value)}
+                          onKeyDown={(e) => {
+                            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                              handleRunSubgraphCypher();
+                            }
+                          }}
+                          rows={2}
+                          placeholder="MATCH (n) RETURN n"
+                          className="w-full bg-[#070b14] text-cyan-300 font-mono text-xs p-2.5 rounded-lg border border-slate-700/80 focus:border-cyan-500 focus:outline-none resize-none leading-relaxed"
+                        />
+                        <span className="absolute bottom-2 right-2 text-[9px] font-mono text-slate-500">
+                          Ctrl + Enter to run
+                        </span>
+                      </div>
+
+                      {/* Error message */}
+                      {cypherError && (
+                        <div className="p-2 mb-2 rounded bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                          <span className="font-mono text-[11px]">{cypherError}</span>
+                        </div>
+                      )}
+
+                      {/* Action Row */}
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleRunSubgraphCypher()}
+                            disabled={isExecutingCypher || !cypherQuery.trim()}
+                            className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded-lg text-xs font-mono font-medium flex items-center gap-1.5 transition-all shadow-lg shadow-cyan-600/20"
+                          >
+                            {isExecutingCypher ? (
+                              <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Play className="w-3.5 h-3.5 fill-current" />
+                            )}
+                            {isExecutingCypher ? 'Running...' : 'Run Query'}
+                          </button>
+
+                          {customSubgraphData && (
+                            <button
+                              type="button"
+                              onClick={handleResetSubgraph}
+                              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-mono flex items-center gap-1 border border-slate-700 transition-all"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>Reset</span>
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          {customSubgraphData && (
+                            <span className="text-[11px] font-mono text-cyan-400">
+                              {customSubgraphData.nodes.length} nodes, {customSubgraphData.edges.length} edges
+                            </span>
+                          )}
+                          {retrievedInfo && (
+                            <button
+                              type="button"
+                              onClick={() => setShowRetrievedDrawer(!showRetrievedDrawer)}
+                              className="text-[11px] font-mono text-slate-300 hover:text-white flex items-center gap-1 px-2 py-1 rounded bg-slate-800/80 border border-slate-700 transition-all"
+                            >
+                              <Info className="w-3 h-3 text-cyan-400" />
+                              <span>{showRetrievedDrawer ? 'Hide Details' : 'Retrieved Info'}</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Retrieved Info Drawer / Table */}
+                      {showRetrievedDrawer && retrievedInfo && (
+                        <div className="mt-2 pt-2 border-t border-slate-700/60 space-y-2">
+                          <div className="flex items-center justify-between text-[11px] font-mono text-slate-300">
+                            <span className="font-semibold text-cyan-300 flex items-center gap-1">
+                              <Database className="w-3.5 h-3.5" /> Retrieved Report Entities ({retrievedInfo.nodes.length}):
+                            </span>
+                            <span className="text-[10px] text-slate-400">Click node to focus in graph</span>
+                          </div>
+
+                          {/* Nodes Pill List */}
+                          <div className="max-h-36 overflow-y-auto space-y-1 pr-1 font-mono text-xs">
+                            {retrievedInfo.nodes.map((node) => (
+                              <div
+                                key={node.data.id}
+                                onClick={() => handleFocusNode(node.data.id)}
+                                className="p-1.5 rounded bg-slate-900/90 border border-slate-800 hover:border-cyan-500/50 hover:bg-slate-800/80 cursor-pointer flex items-center justify-between text-[11px] transition-all"
+                              >
+                                <div className="flex items-center gap-2 truncate">
+                                  <span
+                                    className="px-1.5 py-0.5 rounded text-[9px] font-bold text-white uppercase shrink-0"
+                                    style={{ backgroundColor: LABEL_COLORS[node.data.label] || '#64748b' }}
+                                  >
+                                    {node.data.label}
+                                  </span>
+                                  <span className="text-slate-200 font-semibold truncate">{node.data.name}</span>
+                                </div>
+                                {node.data.ioc_type && (
+                                  <span className="text-[10px] text-cyan-400 shrink-0 uppercase">
+                                    {node.data.ioc_type}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Edges List if any */}
+                          {retrievedInfo.edges.length > 0 && (
+                            <div className="pt-1.5 border-t border-slate-800/80">
+                              <div className="text-[10px] font-mono text-slate-400 mb-1">
+                                Matched Relationships ({retrievedInfo.edges.length}):
+                              </div>
+                              <div className="max-h-24 overflow-y-auto space-y-1 font-mono text-[10px]">
+                                {retrievedInfo.edges.map((edge) => (
+                                  <div
+                                    key={edge.data.id}
+                                    className="p-1 rounded bg-slate-900/60 border border-slate-800 flex items-center justify-between text-slate-400"
+                                  >
+                                    <span className="truncate max-w-[40%] text-slate-300">{edge.data.source}</span>
+                                    <span className="text-cyan-400 font-bold px-1.5 text-[9px]">{edge.data.label || edge.data.rel_type}</span>
+                                    <span className="truncate max-w-[40%] text-slate-300">{edge.data.target}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* The Cytoscape Canvas */}
+                  <div ref={cySubRef} className="w-full flex-1" />
+
+                  {/* Bottom Status Pill */}
                   <div className="absolute bottom-2 left-2 px-2.5 py-1 rounded bg-slate-900/80 border border-cyber-border text-[10px] font-mono text-slate-400 z-10 flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-                    <span>Interactive Subgraph • Drag & Zoom nodes</span>
+                    <span>
+                      {customSubgraphData
+                        ? `Filtered: ${customSubgraphData.nodes.length} nodes, ${customSubgraphData.edges.length} edges`
+                        : `Interactive Subgraph (${result.generated_subgraph?.nodes.length || 0} nodes) • Drag & Zoom`}
+                    </span>
                   </div>
                 </div>
               )}

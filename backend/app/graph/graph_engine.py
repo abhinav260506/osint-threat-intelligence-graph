@@ -169,6 +169,129 @@ class ThreatKnowledgeGraph:
             },
         }
 
+    def execute_cypher(self, query: str) -> Dict[str, Any]:
+        """In-memory Cypher query evaluator for NetworkX graph when Neo4j is unavailable."""
+        import re
+
+        q = query.strip()
+        limit_match = re.search(r"LIMIT\s+(\d+)", q, re.IGNORECASE)
+        limit = int(limit_match.group(1)) if limit_match else 500
+
+        # Pattern: MATCH (a:Label1)-[r:REL_TYPE]->(b:Label2) or MATCH (a)-[r]->(b)
+        rel_pattern = re.search(
+            r"MATCH\s*\((?P<src_var>\w+)?(?::(?P<src_label>\w+))?\)\s*-\s*\[(?P<rel_var>\w+)?(?::(?P<rel_type>\w+))?\]\s*->?\s*\((?P<tgt_var>\w+)?(?::(?P<tgt_label>\w+))?\)",
+            q,
+            re.IGNORECASE,
+        )
+
+        matched_nodes = {}
+        matched_edges = {}
+
+        if rel_pattern:
+            src_label = rel_pattern.group("src_label")
+            rel_type = rel_pattern.group("rel_type")
+            tgt_label = rel_pattern.group("tgt_label")
+
+            for u, v, k, d in self.g.edges(keys=True, data=True):
+                u_data = self.g.nodes.get(u, {})
+                v_data = self.g.nodes.get(v, {})
+
+                if src_label and u_data.get("label", "").lower() != src_label.lower():
+                    continue
+                if tgt_label and v_data.get("label", "").lower() != tgt_label.lower():
+                    continue
+                edge_rel = str(d.get("rel_type") or k)
+                if rel_type and edge_rel.upper() != rel_type.upper():
+                    continue
+
+                matched_nodes[u] = u_data
+                matched_nodes[v] = v_data
+                edge_id = f"{u}->{v}:{k}"
+                matched_edges[edge_id] = {
+                    "id": edge_id,
+                    "source": u,
+                    "target": v,
+                    "label": edge_rel,
+                    "rel_type": edge_rel,
+                    **d,
+                }
+                if len(matched_nodes) >= limit:
+                    break
+        else:
+            # Pattern: MATCH (n:Label) or MATCH (n)
+            node_pattern = re.search(
+                r"MATCH\s*\((?P<var>\w+)?(?::(?P<label>\w+))?\)",
+                q,
+                re.IGNORECASE,
+            )
+            target_label = node_pattern.group("label") if node_pattern else None
+
+            # Check for WHERE clause
+            where_match = re.search(r"WHERE\s+(.+?)(?:\s+RETURN|\s+LIMIT|$)", q, re.IGNORECASE)
+            where_str = where_match.group(1).strip() if where_match else None
+
+            # Check for IN [...]
+            in_labels = None
+            contains_val = None
+            if where_str:
+                in_match = re.search(r"\.label\s+IN\s+\[(.*?)\]", where_str, re.IGNORECASE)
+                if in_match:
+                    in_labels = [s.strip(" '\"").lower() for s in in_match.group(1).split(",")]
+
+                contains_match = re.search(r"\.(?:name|value)\s+CONTAINS\s+['\"](.*?)['\"]", where_str, re.IGNORECASE)
+                if contains_match:
+                    contains_val = contains_match.group(1).lower()
+
+            for n, d in self.g.nodes(data=True):
+                n_label = d.get("label", "Entity")
+                if target_label and n_label.lower() != target_label.lower():
+                    continue
+                if in_labels and n_label.lower() not in in_labels:
+                    continue
+                if contains_val and (
+                    contains_val not in str(d.get("name", "")).lower()
+                    and contains_val not in str(d.get("value", "")).lower()
+                ):
+                    continue
+
+                matched_nodes[n] = d
+                if len(matched_nodes) >= limit:
+                    break
+
+            # Also collect edges connecting the matched nodes
+            matched_node_ids = set(matched_nodes.keys())
+            for u, v, k, d in self.g.edges(keys=True, data=True):
+                if u in matched_node_ids and v in matched_node_ids:
+                    edge_id = f"{u}->{v}:{k}"
+                    edge_rel = str(d.get("rel_type") or k)
+                    matched_edges[edge_id] = {
+                        "id": edge_id,
+                        "source": u,
+                        "target": v,
+                        "label": edge_rel,
+                        "rel_type": edge_rel,
+                        **d,
+                    }
+
+        nodes = [
+            {
+                "data": {
+                    "id": nid,
+                    "label": ndata.get("label", "Entity"),
+                    "name": ndata.get("name", nid),
+                    **{k: v for k, v in ndata.items() if k not in ("id", "label", "name")},
+                }
+            }
+            for nid, ndata in matched_nodes.items()
+        ]
+        edges = [{"data": edata} for edata in matched_edges.values()]
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "stats": {"total_nodes": len(nodes), "total_edges": len(edges)},
+        }
+
     def clear(self):
         """Resets the in-memory graph."""
         self.g.clear()

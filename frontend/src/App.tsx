@@ -17,6 +17,7 @@ export const App: React.FC = () => {
   });
   const [isSeeding, setIsSeeding] = useState<boolean>(false);
   const [dataVersion, setDataVersion] = useState<number>(0);
+  const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
 
   const loadGraphData = async () => {
     try {
@@ -30,6 +31,12 @@ export const App: React.FC = () => {
   const refreshAll = async () => {
     await loadGraphData();
     setDataVersion((v) => v + 1);
+  };
+
+  const handleNavigateToGraph = (nodeId?: string) => {
+    setFocusNodeId(nodeId || null);
+    setActiveTab('graph');
+    refreshAll();
   };
 
   useEffect(() => {
@@ -61,7 +68,7 @@ export const App: React.FC = () => {
 
       <main className="flex-1 w-full overflow-hidden">
         {activeTab === 'graph' && (
-          <GraphView graphData={graphData} onRefresh={refreshAll} />
+          <GraphView graphData={graphData} onRefresh={refreshAll} focusNodeId={focusNodeId} />
         )}
         {activeTab === 'clusters' && (
           <ClusterView dataVersion={dataVersion} onRefresh={refreshAll} />
@@ -75,10 +82,7 @@ export const App: React.FC = () => {
         {activeTab === 'ingestion' && (
           <IngestionWorkbench
             onIngested={refreshAll}
-            onNavigateToGraph={() => {
-              refreshAll();
-              setActiveTab('graph');
-            }}
+            onNavigateToGraph={handleNavigateToGraph}
           />
         )}
       </main>

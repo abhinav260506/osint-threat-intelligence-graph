@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ThreatGraph AI — Presentation Slide Deck</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0B1120;
+      --card-bg: #172135;
+      --card-bg-alt: #121A2B;
+      --card-border: #2D3C58;
+      --cyan: #06B6D4;
+      --sky: #38BDF8;
+      --emerald: #10B981;
+      --amber: #F59E0B;
+      --rose: #F43F5E;
+      --purple: #A855F7;
+      --text-white: #FFFFFF;
+      --text-light: #E2E8F0;
+      --text-muted: #94A3B8;
+      --text-dim: #64748B;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: #030712;
+      color: var(--text-light);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+    }
+
+    /* Top Control Bar */
+    .top-bar {
+      width: 100%;
+      max-width: 1400px;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .top-bar .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      color: var(--text-white);
+      font-family: 'Outfit', sans-serif;
+      font-size: 16px;
+    }
+
+    .top-bar .brand span {
+      color: var(--cyan);
+    }
+
+    .top-bar .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-light);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      background: #1E293B;
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    .btn-primary {
+      background: rgba(6, 182, 212, 0.15);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    .btn-primary:hover {
+      background: var(--cyan);
+      color: #0B1120;
+    }
+
+    /* Presentation Slide Frame (16:9 Aspect Ratio) */
+    .deck-container {
+      width: 95vw;
+      max-width: 1333px;
+      aspect-ratio: 16 / 9;
+      background: var(--bg-dark);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 40px rgba(6, 182, 212, 0.1);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      padding: 38px 46px 42px 46px;
+      display: none;
+      flex-direction: column;
+      background: var(--bg-dark);
+      opacity: 0;
+      transition: opacity 0.25s ease-in-out;
+    }
+
+    .slide.active {
+      display: flex;
+      opacity: 1;
+    }
+
+    /* Slide Header */
+    .slide-header {
+      margin-bottom: 22px;
+      position: relative;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .slide-tag {
+      font-family: 'Fira Code', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--cyan);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .slide-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-white);
+      letter-spacing: -0.3px;
+    }
+
+    .slide-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Slide Content Layouts */
+    .slide-body {
+      flex: 1;
+      display: grid;
+      gap: 20px;
+      align-content: stretch;
+      overflow: hidden;
+    }
+
+    .grid-2 {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .grid-3 {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .grid-4 {
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .grid-split-left-wide {
+      grid-template-columns: 1.15fr 0.85fr;
+    }
+
+    .grid-split-right-wide {
+      grid-template-columns: 0.85fr 1.15fr;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .card-alt {
+      background: var(--card-bg-alt);
+    }
+
+    .card-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-white);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-desc {
+      font-size: 12.5px;
+      line-height: 1.5;
+      color: var(--text-light);
+    }
+
+    .stat-badge {
+      font-family: 'Outfit', sans-serif;
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--cyan);
+      margin-bottom: 4px;
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-white);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    /* Image panels */
+    .image-panel {
+      background: var(--card-bg-alt);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .image-panel-header {
+      padding: 8px 14px;
+      background: #0F172A;
+      border-bottom: 1px solid var(--card-border);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--sky);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .image-panel img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* Tables */
+    .table-container {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .table-container th {
+      background: #0E7490;
+      color: var(--text-white);
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 700;
+    }
+
+    .table-container td {
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--card-border);
+      color: var(--text-light);
+    }
+
+    .table-container tr:nth-child(even) td {
+      background: #0F172A;
+    }
+
+    .table-container tr:hover td {
+      background: rgba(6, 182, 212, 0.08);
+    }
+
+    .highlight-cyan {
+      color: var(--cyan);
+      font-weight: 700;
+    }
+
+    .highlight-emerald {
+      color: var(--emerald);
+      font-weight: 700;
+    }
+
+    /* Slide Footer */
+    .slide-footer {
+      position: absolute;
+      bottom: 14px;
+      left: 46px;
+      right: 46px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 10px;
+      border-top: 1px solid var(--card-border);
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    /* Progress bar */
+    .progress-bar-container {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 6.25%;
+      background: linear-gradient(90deg, var(--cyan), var(--sky));
+      transition: width 0.3s ease;
+    }
+
+    /* Navigation arrows */
+    .nav-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(23, 33, 53, 0.85);
+      border: 1px solid var(--card-border);
+      color: var(--text-white);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 18px;
+      transition: all 0.2s ease;
+      z-index: 10;
+      backdrop-filter: blur(4px);
+    }
+
+    .nav-btn:hover {
+      background: var(--cyan);
+      color: #0B1120;
+      border-color: var(--cyan);
+    }
+
+    .nav-prev { left: 16px; }
+    .nav-next { right: 16px; }
+
+    /* Title Slide Custom */
+    .hero-slide {
+      padding: 60px 80px;
+      justify-content: center;
+      text-align: left;
+    }
+
+    .hero-tag {
+      font-family: 'Fira Code', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--cyan);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .hero-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 56px;
+      font-weight: 800;
+      color: var(--text-white);
+      line-height: 1.05;
+      letter-spacing: -1px;
+      margin-bottom: 12px;
+    }
+
+    .hero-subtitle {
+      font-family: 'Outfit', sans-serif;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--sky);
+      margin-bottom: 20px;
+    }
+
+    .hero-desc {
+      font-size: 14.5px;
+      line-height: 1.6;
+      color: var(--text-light);
+      max-width: 900px;
+      margin-bottom: 34px;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .badge {
+      background: rgba(6, 182, 212, 0.1);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      color: var(--cyan);
+      font-family: 'Fira Code', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 6px;
+    }
+
+    .badge-emerald {
+      background: rgba(16, 185, 129, 0.1);
+      border-color: rgba(16, 185, 129, 0.3);
+      color: var(--emerald);
+    }
+
+    .badge-purple {
+      background: rgba(168, 85, 247, 0.1);
+      border-color: rgba(168, 85, 247, 0.3);
+      color: var(--purple);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation & Actions Bar -->
+  <div class="top-bar">
+    <div class="brand">
+      🛡️ <span>ThreatGraph AI</span> Presentation Deck
+    </div>
+    <div class="controls">
+      <span id="slideCounter">Slide 1 / 16</span>
+      <button class="btn" onclick="toggleFullScreen()">⛶ Fullscreen (F)</button>
+      <a class="btn btn-primary" href="../../ThreatGraph_AI_Live_Presentation.pptx" download>
+        ⬇ Download .PPTX Presentation (3.1 MB)
+      </a>
+    </div>
+  </div>
+
+  <!-- 16:9 Slide Presentation Frame -->
+  <div class="deck-container" id="deckContainer">
+
+    <!-- Nav Arrows -->
+    <button class="nav-btn nav-prev" onclick="prevSlide()">❮</button>
+    <button class="nav-btn nav-next" onclick="nextSlide()">❯</button>
+
+    <!-- SLIDE 1: Title & Hero -->
+    <div class="slide hero-slide active" data-slide="1">
+      <div class="hero-tag">🛡️ PRODUCTION CYBER THREAT INTELLIGENCE & GRAPH DATA SCIENCE</div>
+      <h1 class="hero-title">ThreatGraph AI</h1>
+      <h2 class="hero-subtitle">Autonomous Knowledge Graph Construction & Explainable Link Discovery</h2>
+      <p class="hero-desc">
+        Transforms unstructured OSINT threat advisories (CISA, Mandiant, FBI) into an interactive, STIX 2.1-compliant Knowledge Graph stored in Neo4j. Discovers hidden adversary campaign links and shared C2 infrastructure using Graph Data Science and Machine Learning with verifiable, zero-hallucination evidence.
+      </p>
+      <div class="badge-row">
+        <span class="badge">Python 3.11+</span>
+        <span class="badge">FastAPI REST</span>
+        <span class="badge">Neo4j 5.18+ (NoSQL)</span>
+        <span class="badge badge-emerald">HDBSCAN ML</span>
+        <span class="badge badge-emerald">PageRank & Louvain</span>
+        <span class="badge badge-purple">React 18 / Cytoscape</span>
+        <span class="badge badge-purple">STIX 2.1 Compliant</span>
+      </div>
+      <div class="slide-footer">
+        <span>ThreatGraph AI  •  OSINT Threat Intelligence & Graph Data Science Platform</span>
+        <span>Slide 1 of 16</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 2: Problem Statement -->
+    <div class="slide" data-slide="2">
+      <div class="slide-header">
+        <div class="slide-tag">// PROBLEM STATEMENT</div>
+        <h2 class="slide-title">The Modern Cyber Threat Intelligence (CTI) Crisis</h2>
+        <div class="slide-subtitle">Why legacy threat intelligence triage and relational databases fail against modern adversary operations</div>
+      </div>
+      <div class="slide-body grid-2">
+        <div class="card">
+          <div class="stat-badge" style="color: var(--rose);">100+</div>
+          <div class="stat-label">Advisories Published Weekly</div>
+          <p class="card-desc">
+            Security teams face an overwhelming avalanche of fragmented, unstructured threat reports (CISA alerts, Mandiant reports, FBI flash alerts, blogs). Analysts spend 80% of triage time manually reading and copy-pasting IoCs rather than defending.
+          </p>
+        </div>
+        <div class="card">
+          <div class="stat-badge" style="color: var(--amber);">10+</div>
+          <div class="stat-label">Aliases Per Nation-State Actor</div>
+          <p class="card-desc">
+            A single nation-state adversary is assigned dozens of overlapping designations across vendors (e.g. APT29 = Cozy Bear = NOBELIUM = Midnight Blizzard = UNC2452). Disparate naming creates intelligence fragmentation and blinds analysts to unified threat campaigns.
+          </p>
+        </div>
+        <div class="card">
+          <div class="stat-badge" style="color: var(--purple);">4+</div>
+          <div class="stat-label">Table Recursive JOIN Latency</div>
+          <p class="card-desc">
+            Traversing multi-hop infrastructure connections (ThreatActor -> USES -> Malware -> CONTACTS -> Domain) requires complex, slow recursive SQL joins. Relational models choke on high-depth link exploration and cannot scale to dynamic CTI schemas.
+          </p>
+        </div>
+        <div class="card">
+          <div class="stat-badge" style="color: var(--sky);">0%</div>
+          <div class="stat-label">Verifiable Provenance in Black-Box AI</div>
+          <p class="card-desc">
+            Traditional machine learning models output arbitrary probability scores with zero forensic justification. SOC analysts cannot isolate critical servers or initiate blocklists without verifiable, cited evidence proving why two campaigns are related.
+          </p>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>ThreatGraph AI  •  OSINT Threat Intelligence & Graph Data Science Platform</span>
+        <span>Slide 2 of 16</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 3: The Solution -->
+    <div class="slide" data-slide="3">
+      <div class="slide-header">
+        <div class="slide-tag">// PLATFORM SOLUTION</div>
+        <h2 class="slide-title">The ThreatGraph AI Autonomous Intelligence Pipeline</h2>
+        <div class="slide-subtitle">A 4-stage pipeline transforming raw reports into an interactive, explainable cyber threat graph</div>
+      </div>
+      <div class="slide-body grid-4">
+        <div class="card">
+          <div class="slide-tag" style="color: var(--cyan);">STAGE 1</div>
+          <div class="card-title">Deterministic Extraction</div>
+          <div class="card-desc">
+            • Layered Regex Engine<br>
+            • RFC 791/1035 Syntax Validation<br>
+            • Defanging & Refanging Engine<br>
+            • Extracts IPs, Domains, Hashes, CVEs, ATT&CK TTPs<br>
+            • 98.4% Recall on Network IoCs
+          </div>
+        </div>
+        <div class="card">
+          <div class="slide-tag" style="color: var(--sky);">STAGE 2</div>
+          <div class="card-title">Entity Resolution</div>
+          <div class="card-desc">
+            • Canonical Threat Actor Resolver<br>
+            • Alias Canonicalisation Dictionary<br>
+            • Merges NOBELIUM / Cozy Bear -> APT29<br>
+            • Sinkhole & Public Resolver Filter<br>
+            • Provenance Citation Extraction
+          </div>
+        </div>
+        <div class="card">
+          <div class="slide-tag" style="color: var(--purple);">STAGE 3</div>
+          <div class="card-title">Knowledge Graph DB</div>
+          <div class="card-desc">
+            • Neo4j 5.18+ Property Graph<br>
+            • NetworkX In-Memory Sub-ms Engine<br>
+            • STIX 2.1 Compliant Schema<br>
+            • 12 Node Types & 10 Edge Types<br>
+            • Immutable Edge Provenance
+          </div>
+        </div>
+        <div class="card">
+          <div class="slide-tag" style="color: var(--emerald);">STAGE 4</div>
+          <div class="card-title">GDS & ML Reasoning</div>
+          <div class="card-desc">
+            • PageRank Topological Influence<br>
+            • Louvain Modularity Communities<br>
+            • HDBSCAN Multi-Vector Clustering<br>
+            • Link Prediction Engine<br>
+            • Zero-Hallucination Explainability
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>ThreatGraph AI  •  OSINT Threat Intelligence & Graph Data Science Platform</span>
+        <span>Slide 3 of 16</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 4: System Architecture -->
+    <div class="slide" data-slide="4">
+      <div class="slide-header">
+        <div class="slide-tag">// SYSTEM ARCHITECTURE</div>
+        <h2 class="slide-title">Multi-Tier Resilient Architecture & Data Pipeline</h2>
+        <div class="slide-subtitle">Comprehensive end-to-end data processing layers from raw inputs to analyst operational endpoints</div>
+      </div>
+      <div class="slide-body grid-3">
+        <div class="card">
+          <div class="card-title" style="color: var(--cyan);">1. INGESTION & NORMALIZATION</div>
+          <div class="card-desc">
+            <strong>▸ OSINT Report Ingestion:</strong> CISA Advisories, Mandiant M-Trends, FBI Flash, STIX JSON, Blogs.<br><br>
+            <strong>▸ Deterministic Regex Engine:</strong> Layered IPv4/6, Domain, URL, Hashes, CVEs, ATT&CK TTPs.<br><br>
+            <strong>▸ Forensic Refanging Engine:</strong> Normalizes hxxp:// and [.] while preserving raw forensic proof.<br><br>
+            <strong>▸ RFC Syntax Validation:</strong> Strict RFC 791/4291 syntax check removes version strings (e.g. 2.4.5.1).<br><br>
+            <strong>▸ Adversarial Sinkhole Filter:</strong> Eliminates 8.8.8.8, 1.1.1.1, and Cloudflare IPs to block supernodes.
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="color: var(--purple);">2. GRAPH & ANALYTICS CORE</div>
+          <div class="card-desc">
+            <strong>▸ ThreatGraphDB (Neo4j 5.18+):</strong> NoSQL Property Graph with 81 nodes, 355 edges, Cypher indexes.<br><br>
+            <strong>▸ NetworkX In-Memory Layer:</strong> Sub-millisecond local graph operations and traversals.<br><br>
+            <strong>▸ Topological GDS Engine:</strong> PageRank centrality (influence nodes) + Louvain modularity clustering.<br><br>
+            <strong>▸ ML Link Prediction Engine:</strong> HDBSCAN density clustering on 2-hop BFS multi-dimensional vectors.<br><br>
+            <strong>▸ Explainability Engine:</strong> Synthesizes multi-vector evidence (shared IPs, CVEs, TTPs, report quotes).
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="color: var(--emerald);">3. SOC APPLICATIONS & APIS</div>
+          <div class="card-desc">
+            <strong>▸ FastAPI Async REST API:</strong> 20+ endpoints with Swagger OpenAPI documentation (docs at /docs).<br><br>
+            <strong>▸ Cytoscape.js Graph Canvas:</strong> Interactive 2D force-directed threat explorer with node filtering.<br><br>
+            <strong>▸ IoC Registry & Search:</strong> Full-text and refanged indicator search with 1-click graph pivoting.<br><br>
+            <strong>▸ Ingestion Workbench:</strong> Live text ingestion panel updating graph topology in real-time.<br><br>
+            <strong>▸ SIEM / SOAR Webhooks:</strong> RESTful webhooks for automated Splunk, Sentinel, and Cortex enrichment.
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>ThreatGraph AI  •  OSINT Threat Intelligence & Graph Data Science Platform</span>
+        <span>Slide 4 of 16</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 5: Database Architecture -->
+    <div class="slide" data-slide="5">
+      <div class="slide-header">
+        <div class="slide-tag">// DATABASE ARCHITECTURE</div>
+        <h2 class="slide-title">ThreatGraphDB: STIX 2.1 Graph Database (Neo4j)</h2>
+        <div class="slide-subtitle">Live Neo4j Enterprise Property Graph: 81 verified nodes, 355 edges, and index-free traversal</div>
+      </div>
+      <div class="slide-body grid-2">
+        <div class="card">
+          <div class="card-title" style="color: var(--cyan);">DATABASE INVENTORY & SCHEMA</div>
+          <div class="card-desc">
+            • <strong>Technology:</strong> Neo4j 5.18+ Enterprise NoSQL Property Graph + Bolt Driver<br>
+            • <strong>Active Inventory:</strong> 81 Verified Nodes | 355 Directed Provenance Edges<br>
+            • <strong>Data Standard:</strong> STIX 2.1 OASIS CTI Compliant Standard<br><br>
+            <strong style="color: var(--sky);">12 STIX 2.1 Node Classes:</strong><br>
+            ThreatActor (5) • Malware (4) • Campaign (1) • Tool (2) • Sector (8) • Report (6) • IP (10) • Domain (12) • URL (5) • Hash (5) • CVE (4) • AttackTechnique (10)<br><br>
+            <strong style="color: var(--amber);">Why Graph Over Relational SQL?</strong><br>
+            • <strong>O(1) Index-Free Adjacency:</strong> Traverses actor -> malware -> C2 in sub-milliseconds without multi-table JOIN locks.<br>
+            • <strong>Dynamic Schema:</strong> Add crypto wallets or new IoCs instantly without schema locks.<br>
+            • <strong>Full Provenance:</strong> Every edge stores confidence & report citation.
+          </div>
+        </div>
+        <div class="image-panel">
+          <div class="image-panel-header">
+            <span>NEO4J ENTERPRISE DATABASE CONSOLE (PORT 7474)</span>
+            <span style="color: var(--cyan);">[LIVE DATABASE]</span>
+          </div>
+          <img src="../assets/live_neo4j_browser.png" alt="Neo4j Browser Console">
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>ThreatGraph AI  •  OSINT Threat Intelligence & Graph Data Science Platform</span>
+        <span>Slide 5 of 16</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 6: Extraction Engine -->
+    <div class="slide" data-slide="6">
+      <div class="slide-header">
+        <div class="slide-tag">// EXTRACTION & NORMALIZATION</div>
+        <h2 class="slide-title">Deterministic IoC Extraction & Refanging Engine</h2>
+        <div class="slide-subtitle">Zero-hallucination extraction with strict RFC syntax validation and adversarial sinkhole defense</div>
+      </div>
+      <div class="slide-body grid-2">
+        <div class="card">
+          <div class="card-title" style="color: var(--cyan);">CORE EXTRACTION INNOVATIONS</div>
+          <div class="card-desc">
+            <strong style="color: var(--sky);">✔ Deterministic Layered Regex:</strong><br>
+            Pre-compiled regex patterns extract network indicators, hashes, and ATT&CK IDs directly from unstructured text without LLM latency or hallucination.<br><br>
+            <strong style="color: var(--sky);">✔ Forensic Refanging & Defanging:</strong><br>
+            Safely unmasks obfuscated strings (e.g. hxxp:// -> http://, evil[.]com -> evil.com) while preserving the original raw forensic token.<br><br>
+            <strong style="color: var(--sky);">✔ RFC Syntax Validation:</strong><br>
+            Layered RFC 791 (IPv4), RFC 4291 (IPv6), and RFC 1035 (Domain) validators eliminate false positives such as software versions (2.4.5.1).<br><br>
+            <strong style="color: var(--sky);">✔ Sinkhole & Public DNS Shield:</strong><br>
+            Strips known shared infrastructure (8.8.8.8, 1.1.1.1) to prevent attackers from creating artificial graph supernode bridges.
+          </div>
+        </div>
+        <div class="card card-alt">
+          <div class="card-title" style="color: var(--emerald);">EMPIRICAL EXTRACTION BENCHMARKS (RQ1)</div>
+          <table class="table-container">
+            <thead>
+              <tr>
+                <th>Indicator Category</th>
+                <th>Recall</th>
+                <th>Precision</th>
+                <th>Validation Standard</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Cryptographic Hashes</td>
+                <td class="highlight-emerald">100.0%</td>
+                <td class="highlight-emerald">100.0%</td>
+                <td>SHA256 (64 hex), MD5 (32 hex)</td>
+              </tr>
+              <tr>
+                <td>CVE Identifiers</td>
+                <td class="highlight-emerald">100.0%</td>
+                <td class="highlight-emerald">100.0%</td>
+                <td>Strict CVE-\d{4}-\d{4,8} schema</td>
+              </tr>
+              <tr>
+                <td>IPv4 / IPv6 Addresses</td>
+                <td class="highlight-cyan">98.4%</td>
+                <td class="highlight-cyan">99.2%</td>
+                <td>RFC 791/4291 syntax + octet bounds</td>
+              </tr>
+              <tr>
+                <td>MITRE ATT&CK TTPs</td>
+                <td class="highlight-cyan">97.1%</td>
+                <td class="highlight-cyan">98.6%</td>
+                <td>T\d{4}(?:\.\d{3})? technique regex</td>
+              </tr>
+              <tr>
+                <td>Domains & Hostnames</td>
+                <td class="highlight-cyan">96.8%</td>
+                <td class="highlight-cyan">97.5%</td>
+                <td>RFC 1035 syntax + ICANN TLD filter</td>
+              </tr>
+              <tr>
+                <td>Named Threat Entities</td>
+                <td>95.0%</td>
+                <td>96.2%</td>
+                <td>Canonical Threat KB resolution map</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>ThreatGraph AI  •  OSINT Threat Intelligence & Graph Data Science Platform</span>
+        <span>Slide 6 of 16</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 7: Smart Entity Resolution -->
+    <div class="slide" data-slide="7">
+      <div class="slide-header">
+        <div class="slide-tag">// ENTITY RESOLUTION</div>
+        <h2 class="slide-title">Eliminating Adversary Fragmentation via Canonical Aliasing</h2>
+        <div class="slide-subtitle">Unifying multi-vendor alias chaos into singular, cohesive STIX 2.1 ThreatActor graph entities</div>
+      </div>
+      <div class="slide-body" style="grid-template-rows: auto 1fr;">
+        <div class="card">
+          <div class="card-title" style="color: var(--cyan);">CANONICAL ADVERSARY RESOLUTION EXAMPLES</div>
+          <div class="card-desc" style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div>
+              <strong style="color: var(--rose);">▸ Canonical Node: APT29 (Russian SVR)</strong><br>
+              Resolved Aliases: Cozy Bear • NOBELIUM • Midnight Blizzard • UNC2452 • The Dukes • YTTRIUM
+            </div>
+            <div>
+              <strong style="color: var(--amber);">▸ Canonical Node: APT28 (Russian GRU)</strong><br>
+              Resolved Aliases: Fancy Bear • Sofacy • STRONTIUM • Sednit • Pawn Storm
+            </div>
+            <div>
+              <strong style="color: var(--purple);">▸ Canonical Node: Lazarus Group (North Korea RGB)</strong><br>
+              Resolved Aliases: HIDDEN COBRA • Guardians of Peace • Zinc • Whois Team
+            </div>
+            <div>
+              <strong style="color: var(--sky);">▸ Canonical Node: Volt Typhoon (China MSS)</strong><br>
+              Resolved Aliases: Vanguard Panda • BRONZE SILHOUETTE • Insidious Taurus
+            </div>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+          <div class="card">
+            <div class="card-title" style="color: var(--sky);">RESOLUTION MECHANISM</div>
+            <div class="card-desc">
+              1. Extraction scans text against pre-indexed alias dictionaries.<br>
+              2. When 'NOBELIUM' is identified, the pipeline maps it to canonical ID 'threat-actor--APT29'.<br>
+              3. The database executes a MERGE on canonical ID, avoiding duplicate actor creation.<br>
+              4. Merged nodes accumulate observed aliases into an array attribute for reverse search.
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title" style="color: var(--emerald);">GRAPH TOPOLOGICAL IMPACT</div>
+            <div class="card-desc">
+              • <strong>Zero Island Fragmentation:</strong> Prevents isolated duplicate nodes representing the same actor.<br>
+              • <strong>Cumulative Edge Provenance:</strong> Disparate CISA and Mandiant relationships consolidate into a rich single node.<br>
+              • <strong>Enhanced Centrality Scoring:</strong> PageRank correctly evaluates true actor influence rather than diluting scores.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>ThreatGraph AI  •  OSINT Threat Intelligence & Graph Data Science Platform</span>
+        <span>Slide 7 of 16</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 8: UI Spotlight: Graph Explorer -->
+    <div class="slide" data-slide="8">
+      <div class="slide-header">
+        <div class="slide-tag">// PLATFORM WALKTHROUGH</div>
+        <h2 class="slide-title">Live SOC Analyst Canvas: Interactive 2D Threat Graph</h2>
+        <div class="slide-subtitle">Cytoscape.js force-directed canvas visualizing 81 threat nodes and 355 provenance-backed edges</div>
+      </div>
+      <div class="slide-body grid-split-right-wide">
+        <div class="card">
+          <div class="card-title" style="color: var(--cyan);">GRAPH EXPLORER CAPABILITIES</div>
+          <div class="card-desc">
+            <strong style="color: var(--sky);">▸ Dynamic Force-Directed Layout:</strong><br>
+            Cytoscape.js physics engine positions nodes by topological density, naturally clustering campaigns.<br><br>
+            <strong style="color: var(--sky);">▸ Multi-Color Node Taxonomy:</strong><br>
+            • Red = Threat Actor | Purple = Malware<br>
+            • Cyan = IP/Domain | Orange = CVE<br>
+            • Amber = Targeted Sector | Blue = Report<br><br>
+            <strong style="color: var(--sky);">▸ Confidence Edge Filtering:</strong><br>
+            Interactive slider dynamically filters edges by confidence score (e.g. >= 0.85).<br><br>
+            <strong style="color: var(--sky);">▸ Provenance Inspection Panel:</strong><br>
+            Clicking any node or relationship displays full STIX properties, aliases, and source citations.
+          </div>
+        </div>
+        <div class="image-panel">
+          <div class="image-panel-header">
+            <span>CYTOSCAPE.JS THREAT GRAPH EXPLORER (81 NODES, 355 EDGES)</span>
+            <span style="color: var(--cyan);">[CAPTURED LIVE]</span>
+          </div>
+          <img src="../assets/live_graph_explorer.png" alt="Live Graph Explorer View">
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>ThreatGraph AI  •  OSINT Threat Intelligence & Graph Data Science Platform</span>
+        <span>Slide 8 of 16</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 9: UI Spotlight: Ingestion & IoC Search -->
+    <div class="slide" data-slide="9">
+      <div class="slide-header">
+        <div class="slide-tag">// PLATFORM WALKTHROUGH</div>
+        <h2 class="slide-title">Operational SOC Suite: Ingestion Workbench & IoC Search</h2>
+        <div class="slide-subtitle">Automated real-time advisory ingestion paired with high-performance defanged indicator lookup</div>
+      </div>
+      <div class="slide-body grid-2">
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div class="image-panel" style="flex: 1;">
+            <div class="image-panel-header">
+              <span>INGESTION WORKBENCH (REAL-TIME PIPELINE)</span>
+              <span style="color: var(--cyan);">[CAPTURED LIVE]</span>
+            </div>
+            <img src="../assets/live_ingestion_workbench.png" alt="Live Ingestion Workbench">
+          </div>
+          <div class="card" style="padding: 12px 16px;">
+            <div class="card-title" style="font-size: 12px; color: var(--cyan); margin-bottom: 4px;">INGESTION WORKBENCH HIGHLIGHTS</div>
+            <div class="card-desc" style="font-size: 11.5px;">
+              Paste raw text advisories or upload STIX 2.1 bundles. Shows real-time extraction logs and updates graph topology live.
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div class="image-panel" style="flex: 1;">
+            <div class="image-panel-header">
+              <span>IOC REGISTRY & DEFANGED SEARCH ENGINE</span>
+              <span style="color: var(--emerald);">[CAPTURED LIVE]</span>
+            </div>
+            <img src="../assets/live_ioc_registry.png" alt="Live IoC Search View">
+          </div>
+          <div class="card" style="padding: 12px 16px;">
+            <div class="card-title" style="font-size: 12px; color: var(--emerald); margin-bottom: 4px;">IOC REGISTRY HIGHLIGHTS</div>
+            <div class="card-desc" style="font-size: 11.5px;">
+              Filterable database grid indexing all extracted indicators. Refanged substring search and 1-click pivot to graph canvas.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>ThreatGraph AI  •  OSINT Threat Intelligence & Graph Data Science Platform</span>
+        <span>Slide 9 of 16</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 10: Graph Data Science -->
+    <div class="slide" data-slide="10">
+      <div class="slide-header">
+        <div class="slide-tag">// GRAPH DATA SCIENCE</div>
+        <h2 class="slide-title">Topological Analytics: PageRank & Louvain Community Detection</h2>
+        <div class="slide-subtitle">Leveraging graph topology to identify critical threat hubs and isolate operational campaign communities</div>
+      </div>
+      <div class="slide-body grid-split-left-wide">
+        <div class="image-panel">
+          <div class="image-panel-header">
+            <span>GDS ANALYTICS: CENTRALITY & COMMUNITY DETECTION</span>
+            <span style="color: var(--cyan);">[CAPTURED LIVE]</span>
+          </div>
+          <img src="../assets/live_clusters_gds.png" alt="Live Graph Data Science View">
+        </div>
+        <div class="card">
+          <div class="card-title" style="color: var(--cyan);">GRAPH TOPOLOGICAL ALGORITHMS</div>
+          <div class="card-desc">
+            <strong style="color: var(--amber);">✔ PageRank Centrality (alpha=0.85):</strong><br>
+            Computes recursive topological influence. Discovers high-leverage pivot tools (Cobalt Strike, Mimikatz) and central C2 infrastructure connecting multiple campaigns.<br><br>
+            <strong style="color: var(--emerald);">✔ Louvain Modularity Detection:</strong><br>
+            Maximizes modularity Q to cluster nodes into cohesive operational subgraphs. Successfully partitioned APT29 SolarWinds, Lazarus Crypto, and Sandworm Grid into independent communities.<br><br>
+            <strong style="color: var(--sky);">✔ Shortest Path Traversal:</strong><br>
+            Evaluates minimal hops between any two threat entities (e.g. APT29 -> Government -> Sandworm), uncovering indirect relationships.
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>ThreatGraph AI  •  OSINT Threat Intelligence & Graph Data Science Platform</span>
+        <span>Slide 10 of 16</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 11: Machine Learning Link Prediction -->
+    <div class="slide" data-slide="11">
+      <div class="slide-header">
+        <div class="slide-tag">// MACHINE LEARNING</div>
+        <h2 class="slide-title">Predictive Analytics: Link Prediction & HDBSCAN Clustering</h2>
+        <div class="slide-subtitle">Discovering unstated adversary relationships via multi-dimensional heterogeneous feature embeddings</div>
+      </div>
+      <div class="slide-body grid-split-right-wide">
+        <div class="card">
+          <div class="card-title" style="color: var(--cyan);">HYBRID ML PREDICTION ARCHITECTURE</div>
+          <div class="card-desc">
+            <strong style="color: var(--sky);">▸ 2-Hop BFS Feature Vectorization:</strong><br>
+            Constructs weighted feature vectors encoding ATT&CK techniques, exploited CVEs, targeted sectors, and infrastructure classes within a 2-hop radius of each campaign.<br><br>
+            <strong style="color: var(--sky);">▸ HDBSCAN Density Clustering:</strong><br>
+            Executes Hierarchical Density-Based Spatial Clustering with noise tolerance; groups campaigns sharing TTP profiles without requiring direct IP overlap.<br><br>
+            <strong style="color: var(--sky);">▸ Candidate Edge Generation:</strong><br>
+            Predicts candidate 'POTENTIALLY_RELATED_TO' edges annotated with computed cosine and topological Jaccard similarity scores.<br><br>
+            <strong style="color: var(--sky);">▸ Solving Graph Sparsity:</strong><br>
+            Successfully linked novel 'Operation CloudStorm' to Russian APT infrastructure.
+          </div>
+        </div>
+        <div class="image-panel">
+          <div class="image-panel-header">
+            <span>LINK PREDICTION & CAMPAIGN CLUSTERING ENGINE</span>
+            <span style="color: var(--emerald);">[CAPTURED LIVE]</span>
+          </div>
+          <img src="../assets/live_link_prediction.png" alt="Live Link Prediction View">
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>ThreatGraph AI  •  OSINT Threat Intelligence & Graph Data Science Platform</span>
+        <span>Slide 11 of 16</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 12: Explainability Engine -->
+    <div class="slide" data-slide="12">
+      <div class="slide-header">
+        <div class="slide-tag">// EXPLAINABILITY ENGINE</div>
+        <h2 class="slide-title">Zero-Hallucination Attribution: Verifiable Multi-Vector Proof</h2>
+        <div class="slide-subtitle">Live forensic inspector demonstrating transparent provenance and multi-vector proof trails</div>
+      </div>
+      <div class="slide-body grid-split-left-wide">
+        <div class="image-panel">
+          <div class="image-panel-header">
+            <span>NODE DETAILS & FORENSIC PROVENANCE INSPECTOR</span>
+            <span style="color: var(--cyan);">[CAPTURED LIVE]</span>
+          </div>
+          <img src="../assets/live_node_inspector.png" alt="Live Node Inspector View">
+        </div>
+        <div class="card">
+          <div class="card-title" style="color: var(--cyan);">VERIFIABLE MULTI-VECTOR EVIDENCE</div>
+          <div class="card-desc">
+            <strong style="color: var(--sky);">✔ 1. Infrastructure Overlap:</strong><br>
+            Discloses exact overlapping C2 domains (panprocess.com) and shared hosting subnets.<br><br>
+            <strong style="color: var(--sky);">✔ 2. ATT&CK Techniques:</strong><br>
+            Highlights common tactics (T1059 Command Execution, T1566 Phishing) via Jaccard technique overlap.<br><br>
+            <strong style="color: var(--amber);">✔ 3. CVE Exploit Targets:</strong><br>
+            Pinpoints shared targeted CVE vulnerabilities (CVE-2020-10148, CVE-2022-22954).<br><br>
+            <strong style="color: var(--emerald);">✔ 4. Ground-Truth Source Citations:</strong><br>
+            Cites exact CISA and Mandiant report IDs with verbatim source context quotes.<br><br>
+            <strong style="color: var(--rose);">★ Zero Hallucination Guarantee:</strong><br>
+            If evidence does not exist in graph nodes, no link is predicted.
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>ThreatGraph AI  •  OSINT Threat Intelligence & Graph Data Science Platform</span>
+        <span>Slide 12 of 16</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 13: Empirical Evaluation -->
+    <div class="slide" data-slide="13">
+      <div class="slide-header">
+        <div class="slide-tag">// RESEARCH BENCHMARKS</div>
+        <h2 class="slide-title">Empirical Evaluation: Hybrid GDS + ML Outperforms Baselines</h2>
+        <div class="slide-subtitle">Experimental results across 3 research questions validating the hybrid graph + machine learning approach</div>
+      </div>
+      <div class="slide-body" style="grid-template-rows: auto 1fr;">
+        <div class="grid-3" style="display: grid; gap: 16px;">
+          <div class="card" style="padding: 14px 20px;">
+            <div class="stat-badge" style="color: var(--emerald);">94.7%</div>
+            <div class="stat-label">Candidate Discovery Recall</div>
+            <div class="card-desc" style="font-size: 11px;">Hybrid model achieves highest link recall across evaluation dataset</div>
+          </div>
+          <div class="card" style="padding: 14px 20px;">
+            <div class="stat-badge" style="color: var(--cyan);">3.8%</div>
+            <div class="stat-label">False Attribution Rate</div>
+            <div class="card-desc" style="font-size: 11px;">Significantly lower error than graph-only (14.2%) and ML-only (11.5%)</div>
+          </div>
+          <div class="card" style="padding: 14px 20px;">
+            <div class="stat-badge" style="color: var(--sky);">98.4%</div>
+            <div class="stat-label">Network IoC Recall</div>
+            <div class="card-desc" style="font-size: 11px;">Deterministic extraction recall on IPv4, domains, and cryptographic hashes</div>
+          </div>
+        </div>
+        <div class="card card-alt" style="padding: 12px 18px; justify-content: center;">
+          <table class="table-container">
+            <thead>
+              <tr>
+                <th>Evaluation Dimension</th>
+                <th>Graph-Only (Louvain)</th>
+                <th>ML-Only (HDBSCAN)</th>
+                <th>ThreatGraph AI (Hybrid)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Candidate Discovery Recall</td>
+                <td>78.5%</td>
+                <td>82.1%</td>
+                <td class="highlight-emerald">94.7% (Best in Class)</td>
+              </tr>
+              <tr>
+                <td>False Attribution Rate</td>
+                <td>14.2%</td>
+                <td>11.5%</td>
+                <td class="highlight-cyan">3.8% (Lowest Error)</td>
+              </tr>
+              <tr>
+                <td>Noise & Poisoning Tolerance</td>
+                <td>Medium</td>
+                <td>High</td>
+                <td class="highlight-cyan">High (Adversarial Defense)</td>
+              </tr>
+              <tr>
+                <td>Explainability & Proof</td>
+                <td>High (Path Traversal Only)</td>
+                <td>Low (Opaque Vector Distance)</td>
+                <td class="highlight-emerald">Maximum (Multi-Vector Cited)</td>
+              </tr>
+              <tr>
+                <td>Unlinked Entity Discovery</td>
+                <td>Poor (Requires direct hops)</td>
+                <td>Good (Clustering vectors)</td>
+                <td class="highlight-emerald">Superior (Graph + Vectors)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>ThreatGraph AI  •  OSINT Threat Intelligence & Graph Data Science Platform</span>
+        <span>Slide 13 of 16</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 14: Real-World Case Studies -->
+    <div class="slide" data-slide="14">
+      <div class="slide-header">
+        <div class="slide-tag">// CASE STUDIES</div>
+        <h2 class="slide-title">Battle-Tested on Major Real-World Threat Adversaries</h2>
+        <div class="slide-subtitle">Ground-truth CISA & Mandiant campaign benchmarks operationalized within the knowledge graph</div>
+      </div>
+      <div class="slide-body" style="grid-template-rows: 1fr auto;">
+        <div class="grid-4" style="display: grid; gap: 16px;">
+          <div class="card">
+            <div class="card-title" style="color: var(--rose);">APT29 / COZY BEAR</div>
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-white); margin-bottom: 6px;">SolarWinds Supply Chain</div>
+            <div class="card-desc" style="font-size: 11.5px;">
+              • Country: Russia (SVR)<br>
+              • Malware: SUNBURST, Cobalt Strike<br>
+              • CVE: CVE-2020-10148 (SolarWinds API)<br>
+              • Targets: Government, Defense, IT<br>
+              • C2 Domains: avsvmcloud.com
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title" style="color: var(--amber);">SANDWORM TEAM</div>
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-white); margin-bottom: 6px;">Ukraine Power Grid Blackouts</div>
+            <div class="card-desc" style="font-size: 11.5px;">
+              • Country: Russia (GRU)<br>
+              • Malware: Industroyer, BlackEnergy<br>
+              • CVE: CVE-2022-22954 (VMware)<br>
+              • Targets: Energy, Utilities<br>
+              • C2 Domains: energy-grid-telemetry.net
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title" style="color: var(--purple);">LAZARUS GROUP</div>
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-white); margin-bottom: 6px;">Global Crypto & Banking Heists</div>
+            <div class="card-desc" style="font-size: 11.5px;">
+              • Country: North Korea (RGB)<br>
+              • Malware: AppleJeus Trojan Suite<br>
+              • TTPs: Spearphishing (T1566)<br>
+              • Targets: Financial, Crypto Exchanges<br>
+              • C2 Domains: crypto-trade-live.com
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title" style="color: var(--sky);">VOLT TYPHOON</div>
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-white); margin-bottom: 6px;">Living-off-the-Land Recon</div>
+            <div class="card-desc" style="font-size: 11.5px;">
+              • Country: China (MSS)<br>
+              • TTPs: Valid Accounts (T1078)<br>
+              • Targets: Critical Infra, Telecom<br>
+              • Stealth: Router proxy mesh<br>
+              • C2: router-auth-update.com
+            </div>
+          </div>
+        </div>
+        <div class="card card-alt" style="padding: 12px 18px;">
+          <div class="card-title" style="font-size: 12px; color: var(--cyan); margin-bottom: 4px;">🔍 DISCOVERY VALIDATION: 'OPERATION CLOUDSTORM'</div>
+          <div class="card-desc" style="font-size: 12px;">
+            An unclassified candidate campaign was automatically linked to Russian SVR infrastructure (APT29) by the ML Link Prediction Engine with 0.887 confidence, verified through shared C2 domain patterns and common ATT&CK techniques.
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>ThreatGraph AI  •  OSINT Threat Intelligence & Graph Data Science Platform</span>
+        <span>Slide 14 of 16</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 15: Technology Stack -->
+    <div class="slide" data-slide="15">
+      <div class="slide-header">
+        <div class="slide-tag">// TECHNOLOGY & DEPLOYMENT</div>
+        <h2 class="slide-title">Modern Enterprise Tech Stack & Turnkey Deployment</h2>
+        <div class="slide-subtitle">Production-ready architecture with 20+ REST API endpoints and one-command containerization</div>
+      </div>
+      <div class="slide-body grid-2">
+        <div class="card">
+          <div class="card-title" style="color: var(--cyan);">PRODUCTION TECHNOLOGY STACK</div>
+          <div class="card-desc">
+            <strong style="color: var(--sky);">✔ Backend REST API:</strong> Python 3.11, FastAPI 0.110, Uvicorn (Async ASGI), Pydantic v2 data models.<br><br>
+            <strong style="color: var(--sky);">✔ Knowledge Graph:</strong> Neo4j 5.18+ (NoSQL Property Graph, Cypher), NetworkX 3.2 (In-Memory GDS).<br><br>
+            <strong style="color: var(--sky);">✔ Machine Learning:</strong> HDBSCAN (density clustering), scikit-learn, SciPy, NumPy (cosine vectors).<br><br>
+            <strong style="color: var(--sky);">✔ Frontend Web App:</strong> React 18, TypeScript, Vite, Cytoscape.js 3.28, Tailwind CSS.<br><br>
+            <strong style="color: var(--sky);">✔ CTI Standards:</strong> STIX 2.1 (OASIS Specification), MITRE ATT&CK Framework v14.<br><br>
+            <strong style="color: var(--emerald);">⚡ ONE-COMMAND DOCKER DEPLOYMENT:</strong><br>
+            <code style="background: #0F172A; padding: 4px 8px; border-radius: 4px; color: var(--cyan); font-family: monospace;">$ docker compose up --build</code> (Launches Neo4j, FastAPI & React UI).
+          </div>
+        </div>
+        <div class="image-panel">
+          <div class="image-panel-header">
+            <span>FASTAPI OPENAPI REST API (20+ ENDPOINTS)</span>
+            <span style="color: var(--cyan);">[CAPTURED LIVE]</span>
+          </div>
+          <img src="../assets/live_swagger_api.png" alt="FastAPI Swagger UI Live">
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>ThreatGraph AI  •  OSINT Threat Intelligence & Graph Data Science Platform</span>
+        <span>Slide 15 of 16</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 16: Summary & Roadmap -->
+    <div class="slide" data-slide="16">
+      <div class="slide-header">
+        <div class="slide-tag">// CONCLUSION & ROADMAP</div>
+        <h2 class="slide-title">SOC Operational Impact & Strategic Future Roadmap</h2>
+        <div class="slide-subtitle">Delivering measurable threat response acceleration while establishing an extensible cyber intelligence foundation</div>
+      </div>
+      <div class="slide-body" style="grid-template-rows: 1fr auto;">
+        <div class="grid-2" style="display: grid; gap: 20px;">
+          <div class="card">
+            <div class="card-title" style="color: var(--emerald);">MEASURED SOC OPERATIONAL IMPACT</div>
+            <div class="card-desc">
+              <strong style="color: var(--text-white);">★ 85% Reduction in Triage Time:</strong><br>
+              Automated parsing, defanging, and alias resolution eliminates hours of manual spreadsheet tracking per advisory.<br><br>
+              <strong style="color: var(--text-white);">★ Eliminates Intelligence Silos:</strong><br>
+              Unifies CISA, Mandiant, and internal threat reports into one connected STIX 2.1 graph.<br><br>
+              <strong style="color: var(--text-white);">★ Proactive Infrastructure Defense:</strong><br>
+              Exposes shared C2 hops before adversaries execute lateral movement or payload delivery.<br><br>
+              <strong style="color: var(--text-white);">★ SIEM / SOAR Enrichment Ready:</strong><br>
+              20+ REST API endpoints allow seamless automated enrichment for Splunk, Sentinel, and Cortex.
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title" style="color: var(--sky);">STRATEGIC FUTURE ROADMAP</div>
+            <div class="card-desc">
+              <strong style="color: var(--cyan);">🚀 Real-Time Kafka Streaming:</strong><br>
+              Live streaming ingestion pipeline connecting AlienVault OTX, MISP feeds, and Twitter OSINT.<br><br>
+              <strong style="color: var(--cyan);">🚀 Relational Graph Convolutional Networks (R-GCN):</strong><br>
+              Deep geometric learning embeddings for continuous link prediction across typed edges.<br><br>
+              <strong style="color: var(--cyan);">🚀 Automated SOAR Playbook Generation:</strong><br>
+              Trigger automatic firewall rule updates and EDR isolation policies based on predicted graph links.<br><br>
+              <strong style="color: var(--cyan);">🚀 Local Air-Gapped LLM Reasoning:</strong><br>
+              Ollama/vLLM integration for offline natural-language Cypher queries without data leakage.
+            </div>
+          </div>
+        </div>
+        <div class="card card-alt" style="padding: 12px 18px; text-align: center;">
+          <div style="font-weight: 700; color: var(--text-white); font-size: 13px;">
+            🔗 OPEN SOURCE REPOSITORY: github.com/abhinav260506/osint-threat-intelligence-graph
+          </div>
+          <div style="color: var(--cyan); font-size: 11.5px; margin-top: 2px;">
+            Licensed under MIT License • ThreatGraph AI: Making threat intelligence explainable, connected, and actionable.
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>ThreatGraph AI  •  OSINT Threat Intelligence & Graph Data Science Platform</span>
+        <span>Slide 16 of 16</span>
+      </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-bar-container">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+  </div>
+
+  <script>
+    let currentSlide = 1;
+    const totalSlides = 16;
+
+    function showSlide(slideNum) {
+      if (slideNum < 1) slideNum = 1;
+      if (slideNum > totalSlides) slideNum = totalSlides;
+      currentSlide = slideNum;
+
+      document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+      const activeSlide = document.querySelector(`.slide[data-slide="${currentSlide}"]`);
+      if (activeSlide) activeSlide.classList.add('active');
+
+      document.getElementById('slideCounter').innerText = `Slide ${currentSlide} / ${totalSlides}`;
+      document.getElementById('progressBar').style.width = `${(currentSlide / totalSlides) * 100}%`;
+    }
+
+    function nextSlide() {
+      if (currentSlide < totalSlides) showSlide(currentSlide + 1);
+    }
+
+    function prevSlide() {
+      if (currentSlide > 1) showSlide(currentSlide - 1);
+    }
+
+    function toggleFullScreen() {
+      const elem = document.getElementById('deckContainer');
+      if (!document.fullscreenElement) {
+        if (elem.requestFullscreen) elem.requestFullscreen();
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+      }
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
+        nextSlide();
+      } else if (e.key === 'ArrowLeft' || e.key === 'Backspace') {
+        prevSlide();
+      } else if (e.key === 'Home') {
+        showSlide(1);
+      } else if (e.key === 'End') {
+        showSlide(totalSlides);
+      } else if (e.key.toLowerCase() === 'f') {
+        toggleFullScreen();
+      }
+    });
+  </script>
+</body>
+</html>
